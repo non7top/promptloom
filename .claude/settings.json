@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run download *)",
+      "Bash(adb devices)",
+      "Bash(npm view *)",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_navigate"
+    ]
+  }
+}
