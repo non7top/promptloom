@@ -45,6 +45,35 @@ docker compose run --rm -e DISPLAY dev npm start
 On the target platform (Windows), just run `npm start` directly, no Docker
 needed.
 
+Under pure headless Xvfb (no forwarded X server), the app boots fine, but
+Chromium's GPU process can crash once the webview loads the real,
+JS-heavy perchance page (confirmed unrelated to this app's own code — swapping
+the webview's `src` to `about:blank` runs indefinitely without issue). Use the
+X11-forwarding setup above for anything that needs to exercise the live page.
+
+## Dependencies
+
+Kept deliberately short so pruning unused packages later is easy.
+
+Runtime:
+- `react`, `react-dom` — renderer UI (Definitions/Composer)
+- `electron-squirrel-startup` — handles Windows install/uninstall shortcuts
+
+Storage uses Node's built-in `node:sqlite` (stable in the Node version
+Electron 43 bundles) — no SQLite dependency needed.
+
+Dev/build:
+- `electron`, `@electron-forge/cli` + `plugin-vite` + `plugin-fuses` +
+  `maker-squirrel`/`maker-zip`/`maker-deb`/`maker-rpm` + `publisher-github` +
+  `@electron/fuses` — build, package, and publish the app
+- `vite`, `@vitejs/plugin-react` — bundling; the React plugin is pinned to
+  the 4.x line (not the latest 6.x) because `@electron-forge/plugin-vite`
+  currently requires Vite 5
+- `typescript`, `@types/node`, `@types/react`, `@types/react-dom`,
+  `@types/electron-squirrel-startup` — type-checking
+- `eslint` + `@typescript-eslint/*` + `eslint-plugin-import` +
+  `eslint-plugin-react` + `eslint-plugin-react-hooks` — linting
+
 ## Packaging
 
 ```sh

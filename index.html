@@ -7,9 +7,7 @@
   <body>
     <div id="app">
       <aside id="sidebar">
-        <h1>PromptLoom</h1>
-        <p class="hint">Definitions and batch composer will live here.</p>
-        <p id="status" class="hint"></p>
+        <div id="sidebar-root"></div>
       </aside>
       <webview
         id="generator"
@@ -17,6 +15,6 @@
         partition="persist:perchance"
       ></webview>
     </div>
-    <script type="module" src="/src/renderer.ts"></script>
+    <script type="module" src="/src/renderer.tsx"></script>
   </body>
 </html>

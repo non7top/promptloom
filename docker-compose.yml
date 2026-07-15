@@ -5,11 +5,14 @@ services:
       dockerfile: Dockerfile.dev
     working_dir: /app
     init: true
+    shm_size: '1gb'
     volumes:
       - .:/app
       - node_modules:/app/node_modules
     environment:
       - DISPLAY=${DISPLAY:-}
+      - PROMPTLOOM_DISABLE_GPU=1
+      - ELECTRON_DISABLE_SANDBOX=1
     tty: true
 
 volumes:
