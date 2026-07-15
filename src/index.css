@@ -13,7 +13,7 @@ body {
 }
 
 #sidebar {
-  width: 280px;
+  width: 380px;
   flex: none;
   padding: 1rem;
   box-sizing: border-box;
@@ -29,6 +29,45 @@ body {
 .hint {
   color: #666;
   font-size: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.tabs button.active {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.category {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.category header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.category ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.category li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
 }
 
 webview {

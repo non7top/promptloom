@@ -98,3 +98,6 @@ data/
 
 # Personal/local Claude Code settings (not shared)
 .claude/settings.local.json
+
+# Core dumps from crashed dev-container Electron processes
+core
