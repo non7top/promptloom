@@ -148,6 +148,13 @@ export function saveGeneration(
   };
 }
 
+export function getGenerationImagePath(id: number): string | null {
+  const row = db.prepare('SELECT image_path FROM generations WHERE id = ?').get(id) as
+    | { image_path: string }
+    | undefined;
+  return row?.image_path ?? null;
+}
+
 export function deleteGeneration(id: number): void {
   const row = db.prepare('SELECT image_path FROM generations WHERE id = ?').get(id) as
     | { image_path: string }

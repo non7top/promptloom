@@ -30,6 +30,10 @@ export default function Gallery() {
     reload();
   };
 
+  const saveAs = async (id: number) => {
+    await window.promptloom.saveGenerationAs(id);
+  };
+
   const removeGroup = async (label: string) => {
     if (!window.confirm(`Delete all images grouped under "${label}"?`)) return;
     await window.promptloom.deleteBatch(label);
@@ -56,6 +60,7 @@ export default function Gallery() {
                 <p className="hint">
                   {generation.seed ? `Seed: ${generation.seed}` : 'No seed captured'}
                 </p>
+                <button onClick={() => saveAs(generation.id)}>Save as...</button>
                 <button onClick={() => remove(generation.id)}>Delete</button>
               </li>
             ))}

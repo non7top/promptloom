@@ -47,24 +47,43 @@ async function probeResultImage(webview: Electron.WebviewTag): Promise<ImageProb
  * click Generate, wait for the result image + seed to change, and capture
  * them from the resulting <img>'s `src`/`title`.
  */
+async function injectPromptAndClickGenerate(
+  webview: Electron.WebviewTag,
+  promptText: string,
+): Promise<{ ok: boolean; error?: string }> {
+  // Never throw inside injected code: webview.executeJavaScript() doesn't
+  // propagate the actual JS error message across the guest-view boundary,
+  // only a generic "Script failed to execute" wrapper. Return a result
+  // object instead and raise the real error in normal TS code below.
+  return webview.executeJavaScript(`
+    (() => {
+      try {
+        const textarea = document.querySelector(${JSON.stringify(PROMPT_SELECTOR)});
+        if (!textarea) return { ok: false, error: 'Prompt textarea not found on page' };
+        textarea.value = ${JSON.stringify(promptText)};
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const button = document.querySelector(${JSON.stringify(GENERATE_BUTTON_SELECTOR)});
+        if (!button) return { ok: false, error: 'Generate button not found on page' };
+        button.click();
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: String((err && err.message) || err) };
+      }
+    })();
+  `);
+}
+
 export async function generateImage(
   webview: Electron.WebviewTag,
   promptText: string,
 ): Promise<GenerationResult> {
   const before = await probeResultImage(webview);
 
-  await webview.executeJavaScript(`
-    (() => {
-      const textarea = document.querySelector(${JSON.stringify(PROMPT_SELECTOR)});
-      if (!textarea) throw new Error('Prompt textarea not found on page');
-      textarea.value = ${JSON.stringify(promptText)};
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-
-      const button = document.querySelector(${JSON.stringify(GENERATE_BUTTON_SELECTOR)});
-      if (!button) throw new Error('Generate button not found on page');
-      button.click();
-    })();
-  `);
+  const injected = await injectPromptAndClickGenerate(webview, promptText);
+  if (!injected.ok) {
+    throw new Error(injected.error ?? 'Failed to inject prompt and click Generate');
+  }
 
   const deadline = Date.now() + TIMEOUT_MS;
   while (Date.now() < deadline) {

@@ -42,4 +42,5 @@ export interface PromptLoomApi {
   ): Promise<Generation>;
   deleteGeneration(id: number): Promise<void>;
   deleteBatch(batchLabel: string): Promise<void>;
+  saveGenerationAs(id: number): Promise<string | null>;
 }

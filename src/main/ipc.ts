@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as db from './db';
 
 export function registerIpcHandlers(): void {
@@ -36,4 +38,22 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('generations:deleteBatch', (_event, batchLabel: string) =>
     db.deleteBatch(batchLabel),
   );
+
+  ipcMain.handle('generations:saveAs', async (_event, id: number) => {
+    const imagePath = db.getGenerationImagePath(id);
+    if (!imagePath) return null;
+
+    const saveOptions = {
+      defaultPath: path.basename(imagePath),
+      filters: [{ name: 'PNG Image', extensions: ['png'] }],
+    };
+    const window = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = window
+      ? await dialog.showSaveDialog(window, saveOptions)
+      : await dialog.showSaveDialog(saveOptions);
+    if (canceled || !filePath) return null;
+
+    fs.copyFileSync(imagePath, filePath);
+    return filePath;
+  });
 }

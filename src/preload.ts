@@ -19,6 +19,7 @@ const api: PromptLoomApi = {
     ipcRenderer.invoke('generations:save', batchLabel, promptText, selection, seed, imageDataUrl),
   deleteGeneration: (id) => ipcRenderer.invoke('generations:delete', id),
   deleteBatch: (batchLabel) => ipcRenderer.invoke('generations:deleteBatch', batchLabel),
+  saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
 };
 
 contextBridge.exposeInMainWorld('promptloom', api);
