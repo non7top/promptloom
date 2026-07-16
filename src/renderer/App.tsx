@@ -10,7 +10,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('definitions');
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [webviewStatus, setWebviewStatus] = useState('Connecting...');
+  const [perchanceStatus, setPerchanceStatus] = useState('Connecting...');
 
   const reload = async () => {
     const [nextCategories, nextItems] = await Promise.all([
@@ -28,42 +28,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const webview = document.getElementById('generator') as Electron.WebviewTag | null;
-    if (!webview) return;
-
-    const onReady = () => setWebviewStatus(`Connected: ${webview.getURL()}`);
-    const onFail = (event: Electron.DidFailLoadEvent) =>
-      setWebviewStatus(`Failed to load (${event.errorDescription})`);
-
-    webview.addEventListener('dom-ready', onReady);
-    webview.addEventListener('did-fail-load', onFail);
-    return () => {
-      webview.removeEventListener('dom-ready', onReady);
-      webview.removeEventListener('did-fail-load', onFail);
-    };
-  }, []);
-
-  useEffect(() => {
-    const webview = document.getElementById('generator') as Electron.WebviewTag | null;
-    if (!webview) return;
-
-    const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      const delta = event.deltaY > 0 ? -0.1 : 0.1;
-      const next = Math.min(Math.max(webview.getZoomFactor() + delta, 0.25), 3);
-      webview.setZoomFactor(next);
-    };
-
-    const target = webview as unknown as HTMLElement;
-    target.addEventListener('wheel', onWheel, { passive: false });
-    return () => target.removeEventListener('wheel', onWheel);
+    return window.promptloom.onPerchanceStatus((status) => {
+      setPerchanceStatus(
+        status.connected ? `Connected: ${status.url}` : `Failed to load (${status.error})`,
+      );
+    });
   }, []);
 
   return (
     <div>
       <h1>PromptLoom</h1>
-      <p className="hint">{webviewStatus}</p>
+      <p className="hint">{perchanceStatus}</p>
       <nav className="tabs">
         <button
           className={tab === 'definitions' ? 'active' : ''}

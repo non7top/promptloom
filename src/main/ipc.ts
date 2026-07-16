@@ -2,6 +2,8 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as db from './db';
+import { generateImage } from './perchanceDriver';
+import { getLastPerchanceStatus } from './perchanceView';
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('categories:list', () => db.listCategories());
@@ -56,4 +58,10 @@ export function registerIpcHandlers(): void {
     fs.copyFileSync(imagePath, filePath);
     return filePath;
   });
+
+  ipcMain.handle('driver:generateImage', (_event, promptText: string) =>
+    generateImage(promptText),
+  );
+
+  ipcMain.handle('perchance:getStatus', () => getLastPerchanceStatus());
 }

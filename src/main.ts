@@ -4,10 +4,12 @@ import started from 'electron-squirrel-startup';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers } from './main/ipc';
+import { createPerchanceView, setLastPerchanceStatus } from './main/perchanceView';
+import type { PerchanceStatus } from './shared/types';
 
 // Electron shows no right-click menu anywhere by default (unlike a normal
 // browser) — this adds the standard cut/copy/paste/inspect-element menu,
-// including inside the embedded <webview>.
+// including inside the embedded perchance view.
 contextMenu({
   showInspectElement: true,
 });
@@ -34,7 +36,6 @@ const createWindow = () => {
     height: 860,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      webviewTag: true,
     },
   });
 
@@ -47,6 +48,18 @@ const createWindow = () => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
+
+  const perchanceView = createPerchanceView(mainWindow);
+  const sendStatus = (status: PerchanceStatus) => {
+    setLastPerchanceStatus(status);
+    mainWindow.webContents.send('perchance:status', status);
+  };
+  perchanceView.webContents.on('did-finish-load', () => {
+    sendStatus({ connected: true, url: perchanceView.webContents.getURL() });
+  });
+  perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription) => {
+    sendStatus({ connected: false, error: errorDescription });
+  });
 };
 
 // This method will be called when Electron has finished

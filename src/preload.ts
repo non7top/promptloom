@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PromptLoomApi } from './shared/types';
+import type { PerchanceStatus, PromptLoomApi } from './shared/types';
 
 const api: PromptLoomApi = {
   listCategories: () => ipcRenderer.invoke('categories:list'),
@@ -20,6 +20,19 @@ const api: PromptLoomApi = {
   deleteGeneration: (id) => ipcRenderer.invoke('generations:delete', id),
   deleteBatch: (batchLabel) => ipcRenderer.invoke('generations:deleteBatch', batchLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
+
+  generateImage: (promptText) => ipcRenderer.invoke('driver:generateImage', promptText),
+  onPerchanceStatus: (callback) => {
+    // The view may have already fired its first load event before this
+    // subscribes — fetch the cached status once up front so that event
+    // isn't missed, then keep listening for future updates.
+    ipcRenderer.invoke('perchance:getStatus').then(callback);
+
+    const listener = (_event: Electron.IpcRendererEvent, status: PerchanceStatus) =>
+      callback(status);
+    ipcRenderer.on('perchance:status', listener);
+    return () => ipcRenderer.removeListener('perchance:status', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('promptloom', api);

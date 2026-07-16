@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { Category, Item } from '../shared/types';
-import { generateImage } from './perchanceDriver';
 
 interface Props {
   categories: Category[];
@@ -51,12 +50,6 @@ export default function Composer({ categories, items }: Props) {
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
   const startBatch = async () => {
-    const webview = document.getElementById('generator') as Electron.WebviewTag | null;
-    if (!webview) {
-      setError('Generator webview not found');
-      return;
-    }
-
     const combos = cartesianProduct(categoriesWithItems, selected);
     setRunning(true);
     setError(null);
@@ -71,7 +64,7 @@ export default function Composer({ categories, items }: Props) {
 
       try {
         // eslint-disable-next-line no-await-in-loop -- generations must run sequentially, one page at a time
-        const result = await generateImage(webview, promptText);
+        const result = await window.promptloom.generateImage(promptText);
         // eslint-disable-next-line no-await-in-loop
         await window.promptloom.saveGeneration(
           groupLabel,

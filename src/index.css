@@ -13,6 +13,8 @@ body {
 }
 
 #sidebar {
+  /* Must match SIDEBAR_WIDTH in src/main/perchanceView.ts, which positions
+     the native perchance view to start exactly where this ends. */
   width: 380px;
   flex: none;
   padding: 1rem;
@@ -96,10 +98,6 @@ body {
      regardless of the surrounding panel color. */
   background:
     repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 16px 16px;
-}
-
-webview {
-  flex: 1;
 }
 
 @media print {

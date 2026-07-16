@@ -9,6 +9,13 @@ updates:
         patterns:
           - "@electron-forge/*"
           - "@electron/*"
+    ignore:
+      # @electron-forge/plugin-vite@7.11.2 requires vite@^5 as a peer;
+      # bumping past that breaks the build until the plugin supports it.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
