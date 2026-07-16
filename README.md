@@ -46,10 +46,11 @@ On the target platform (Windows), just run `npm start` directly, no Docker
 needed.
 
 Under pure headless Xvfb (no forwarded X server), the app boots fine, but
-Chromium's GPU process can crash once the webview loads the real,
-JS-heavy perchance page (confirmed unrelated to this app's own code — swapping
-the webview's `src` to `about:blank` runs indefinitely without issue). Use the
-X11-forwarding setup above for anything that needs to exercise the live page.
+Chromium's GPU process can crash once the embedded perchance view loads the
+real, JS-heavy page (confirmed unrelated to this app's own code — temporarily
+pointing `PERCHANCE_URL` in `src/main/perchanceView.ts` at `about:blank` runs
+indefinitely without issue). Use the X11-forwarding setup above for anything
+that needs to exercise the live page.
 
 ## Dependencies
 
@@ -58,6 +59,8 @@ Kept deliberately short so pruning unused packages later is easy.
 Runtime:
 - `react`, `react-dom` — renderer UI (Definitions/Composer)
 - `electron-squirrel-startup` — handles Windows install/uninstall shortcuts
+- `electron-context-menu` — Electron shows no right-click menu anywhere by
+  default; this adds the standard cut/copy/paste/inspect-element menu
 
 Storage uses Node's built-in `node:sqlite` (stable in the Node version
 Electron 43 bundles) — no SQLite dependency needed.

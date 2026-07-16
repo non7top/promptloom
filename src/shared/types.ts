@@ -21,6 +21,18 @@ export interface Generation {
   createdAt: string;
 }
 
+export interface GenerationResult {
+  imageDataUrl: string;
+  seed: string | null;
+  capturedPrompt: string | null;
+}
+
+export interface PerchanceStatus {
+  connected: boolean;
+  url?: string;
+  error?: string;
+}
+
 export interface PromptLoomApi {
   listCategories(): Promise<Category[]>;
   createCategory(name: string): Promise<Category>;
@@ -43,4 +55,7 @@ export interface PromptLoomApi {
   deleteGeneration(id: number): Promise<void>;
   deleteBatch(batchLabel: string): Promise<void>;
   saveGenerationAs(id: number): Promise<string | null>;
+
+  generateImage(promptText: string): Promise<GenerationResult>;
+  onPerchanceStatus(callback: (status: PerchanceStatus) => void): () => void;
 }

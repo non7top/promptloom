@@ -9,6 +9,26 @@ updates:
         patterns:
           - "@electron-forge/*"
           - "@electron/*"
+    ignore:
+      # @electron-forge/plugin-vite@7.11.2 requires vite@^5 as a peer;
+      # bumping past that breaks the build until the plugin supports it.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      # @electron-forge/plugin-fuses@7.11.2 requires @electron/fuses@^1.0.0
+      # as a peer; the same conflict we hit setting this up originally.
+      - dependency-name: "@electron/fuses"
+        update-types: ["version-update:semver-major"]
+      # @typescript-eslint/* is pinned at 5.62.0 and can't parse whatever a
+      # major TS bump changes internally — needs a coordinated upgrade of
+      # typescript + @typescript-eslint/* together, not a piecemeal one.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # ESLint 9+ dropped .eslintrc.json support (flat config only) —
+      # migrating is a deliberate task, not a piecemeal Dependabot bump.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

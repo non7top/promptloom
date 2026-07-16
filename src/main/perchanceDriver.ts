@@ -1,8 +1,6 @@
-export interface GenerationResult {
-  imageDataUrl: string;
-  seed: string | null;
-  capturedPrompt: string | null;
-}
+import type { WebContents } from 'electron';
+import type { GenerationResult } from '../shared/types';
+import { getPerchanceWebContents } from './perchanceView';
 
 interface ImageProbe {
   title: string;
@@ -33,8 +31,8 @@ function extractCapturedPrompt(title: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-async function probeResultImage(webview: Electron.WebviewTag): Promise<ImageProbe | null> {
-  return webview.executeJavaScript(`
+async function probeResultImage(webContents: WebContents): Promise<ImageProbe | null> {
+  return webContents.executeJavaScript(`
     (() => {
       const img = document.querySelector(${JSON.stringify(RESULT_IMAGE_SELECTOR)});
       return img ? { title: img.title, src: img.src } : null;
@@ -42,20 +40,15 @@ async function probeResultImage(webview: Electron.WebviewTag): Promise<ImageProb
   `);
 }
 
-/**
- * Drives the perchance generator page for a single prompt: inject the text,
- * click Generate, wait for the result image + seed to change, and capture
- * them from the resulting <img>'s `src`/`title`.
- */
+// Never throw inside injected code: executeJavaScript() doesn't propagate
+// the actual JS error message across the boundary, only a generic
+// "Script failed to execute" wrapper. Return a result object instead and
+// raise the real error in normal TS code below.
 async function injectPromptAndClickGenerate(
-  webview: Electron.WebviewTag,
+  webContents: WebContents,
   promptText: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  // Never throw inside injected code: webview.executeJavaScript() doesn't
-  // propagate the actual JS error message across the guest-view boundary,
-  // only a generic "Script failed to execute" wrapper. Return a result
-  // object instead and raise the real error in normal TS code below.
-  return webview.executeJavaScript(`
+  return webContents.executeJavaScript(`
     (() => {
       try {
         const textarea = document.querySelector(${JSON.stringify(PROMPT_SELECTOR)});
@@ -74,20 +67,23 @@ async function injectPromptAndClickGenerate(
   `);
 }
 
-export async function generateImage(
-  webview: Electron.WebviewTag,
-  promptText: string,
-): Promise<GenerationResult> {
-  const before = await probeResultImage(webview);
+/**
+ * Drives the perchance generator page for a single prompt: inject the text,
+ * click Generate, wait for the result image + seed to change, and capture
+ * them from the resulting <img>'s `src`/`title`.
+ */
+export async function generateImage(promptText: string): Promise<GenerationResult> {
+  const webContents = getPerchanceWebContents();
+  const before = await probeResultImage(webContents);
 
-  const injected = await injectPromptAndClickGenerate(webview, promptText);
+  const injected = await injectPromptAndClickGenerate(webContents, promptText);
   if (!injected.ok) {
     throw new Error(injected.error ?? 'Failed to inject prompt and click Generate');
   }
 
   const deadline = Date.now() + TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const current = await probeResultImage(webview);
+    const current = await probeResultImage(webContents);
     if (current && current.title !== before?.title && current.src.startsWith('data:image')) {
       return {
         imageDataUrl: current.src,
