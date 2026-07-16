@@ -63,17 +63,19 @@ export default function Composer({ categories, items }: Props) {
     setProgress({ done: 0, total: combos.length });
 
     for (const combo of combos) {
-      const promptText = categoriesWithItems
-        .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
-        .filter((fragment): fragment is string => Boolean(fragment))
-        .join(', ');
+      const comboItems = categoriesWithItems
+        .map((category) => items.find((item) => item.id === combo[category.id]))
+        .filter((item): item is Item => Boolean(item));
+      const promptText = comboItems.map((item) => item.promptFragment).join(', ');
+      const groupLabel = comboItems.map((item) => item.name).join(' - ') || 'Unsorted';
 
       try {
         // eslint-disable-next-line no-await-in-loop -- generations must run sequentially, one page at a time
         const result = await generateImage(webview, promptText);
         // eslint-disable-next-line no-await-in-loop
         await window.promptloom.saveGeneration(
-          promptText,
+          groupLabel,
+          result.capturedPrompt ?? promptText,
           combo,
           result.seed,
           result.imageDataUrl,

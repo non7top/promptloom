@@ -23,6 +23,7 @@ export function initDb(userDataPath: string): void {
     );
     CREATE TABLE IF NOT EXISTS generations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      batch_label TEXT NOT NULL,
       prompt_text TEXT NOT NULL,
       selection_json TEXT NOT NULL,
       seed TEXT,
@@ -92,10 +93,11 @@ export function deleteItem(id: number): void {
 export function listGenerations(): Generation[] {
   const rows = db
     .prepare(
-      'SELECT id, prompt_text, selection_json, seed, image_path, created_at FROM generations ORDER BY id DESC',
+      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at FROM generations ORDER BY id DESC',
     )
     .all() as {
     id: number;
+    batch_label: string;
     prompt_text: string;
     selection_json: string;
     seed: string | null;
@@ -104,6 +106,7 @@ export function listGenerations(): Generation[] {
   }[];
   return rows.map((row) => ({
     id: row.id,
+    batchLabel: row.batch_label,
     promptText: row.prompt_text,
     selection: JSON.parse(row.selection_json),
     seed: row.seed,
@@ -114,6 +117,7 @@ export function listGenerations(): Generation[] {
 }
 
 export function saveGeneration(
+  batchLabel: string,
   promptText: string,
   selection: Record<number, number>,
   seed: string | null,
@@ -122,9 +126,9 @@ export function saveGeneration(
   const createdAt = new Date().toISOString();
   const { lastInsertRowid } = db
     .prepare(
-      'INSERT INTO generations (prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     )
-    .run(promptText, JSON.stringify(selection), seed, '', createdAt);
+    .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
   const id = Number(lastInsertRowid);
 
   const imagePath = path.join(imagesDir, `${id}.png`);
@@ -134,6 +138,7 @@ export function saveGeneration(
 
   return {
     id,
+    batchLabel,
     promptText,
     selection,
     seed,
@@ -149,6 +154,16 @@ export function deleteGeneration(id: number): void {
     | undefined;
   db.prepare('DELETE FROM generations WHERE id = ?').run(id);
   if (row?.image_path) {
+    fs.rmSync(row.image_path, { force: true });
+  }
+}
+
+export function deleteBatch(batchLabel: string): void {
+  const rows = db
+    .prepare('SELECT image_path FROM generations WHERE batch_label = ?')
+    .all(batchLabel) as { image_path: string }[];
+  db.prepare('DELETE FROM generations WHERE batch_label = ?').run(batchLabel);
+  for (const row of rows) {
     fs.rmSync(row.image_path, { force: true });
   }
 }

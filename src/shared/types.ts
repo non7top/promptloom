@@ -12,6 +12,7 @@ export interface Item {
 
 export interface Generation {
   id: number;
+  batchLabel: string;
   promptText: string;
   selection: Record<number, number>; // categoryId -> itemId
   seed: string | null;
@@ -33,10 +34,12 @@ export interface PromptLoomApi {
 
   listGenerations(): Promise<Generation[]>;
   saveGeneration(
+    batchLabel: string,
     promptText: string,
     selection: Record<number, number>,
     seed: string | null,
     imageDataUrl: string,
   ): Promise<Generation>;
   deleteGeneration(id: number): Promise<void>;
+  deleteBatch(batchLabel: string): Promise<void>;
 }

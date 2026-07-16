@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { Generation } from '../shared/types';
 
+function groupByLabel(generations: Generation[]): [string, Generation[]][] {
+  const groups = new Map<string, Generation[]>();
+  for (const generation of generations) {
+    const label = generation.batchLabel || 'Unsorted';
+    const group = groups.get(label) ?? [];
+    group.push(generation);
+    groups.set(label, group);
+  }
+  return Array.from(groups.entries());
+}
+
 export default function Gallery() {
   const [generations, setGenerations] = useState<Generation[]>([]);
 
@@ -19,22 +30,38 @@ export default function Gallery() {
     reload();
   };
 
+  const removeGroup = async (label: string) => {
+    if (!window.confirm(`Delete all images grouped under "${label}"?`)) return;
+    await window.promptloom.deleteBatch(label);
+    reload();
+  };
+
   if (generations.length === 0) {
     return <p className="hint">No generations captured yet.</p>;
   }
 
   return (
-    <ul className="gallery">
-      {generations.map((generation) => (
-        <li key={generation.id}>
-          <img src={generation.imageUrl} alt={generation.promptText} />
-          <p>{generation.promptText}</p>
-          <p className="hint">
-            {generation.seed ? `Seed: ${generation.seed}` : 'No seed captured'}
-          </p>
-          <button onClick={() => remove(generation.id)}>Delete</button>
-        </li>
+    <div>
+      {groupByLabel(generations).map(([label, group]) => (
+        <section className="category" key={label}>
+          <header>
+            <strong>{label}</strong>
+            <button onClick={() => removeGroup(label)}>Delete group</button>
+          </header>
+          <ul className="gallery">
+            {group.map((generation) => (
+              <li key={generation.id}>
+                <img src={generation.imageUrl} alt={generation.promptText} />
+                <p>{generation.promptText}</p>
+                <p className="hint">
+                  {generation.seed ? `Seed: ${generation.seed}` : 'No seed captured'}
+                </p>
+                <button onClick={() => remove(generation.id)}>Delete</button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }

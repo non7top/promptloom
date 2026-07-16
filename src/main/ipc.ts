@@ -25,11 +25,15 @@ export function registerIpcHandlers(): void {
     'generations:save',
     (
       _event,
+      batchLabel: string,
       promptText: string,
       selection: Record<number, number>,
       seed: string | null,
       imageDataUrl: string,
-    ) => db.saveGeneration(promptText, selection, seed, imageDataUrl),
+    ) => db.saveGeneration(batchLabel, promptText, selection, seed, imageDataUrl),
   );
   ipcMain.handle('generations:delete', (_event, id: number) => db.deleteGeneration(id));
+  ipcMain.handle('generations:deleteBatch', (_event, batchLabel: string) =>
+    db.deleteBatch(batchLabel),
+  );
 }
