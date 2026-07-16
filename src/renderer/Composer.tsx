@@ -1,13 +1,29 @@
 import { useMemo, useState } from 'react';
 import type { Category, Item } from '../shared/types';
+import { generateImage } from './perchanceDriver';
 
 interface Props {
   categories: Category[];
   items: Item[];
 }
 
+function cartesianProduct(
+  categories: Category[],
+  selected: Record<number, Set<number>>,
+): Record<number, number>[] {
+  return categories.reduce<Record<number, number>[]>((acc, category) => {
+    const itemIds = Array.from(selected[category.id] ?? []);
+    if (itemIds.length === 0) return acc;
+    if (acc.length === 0) return itemIds.map((itemId) => ({ [category.id]: itemId }));
+    return acc.flatMap((combo) => itemIds.map((itemId) => ({ ...combo, [category.id]: itemId })));
+  }, []);
+}
+
 export default function Composer({ categories, items }: Props) {
   const [selected, setSelected] = useState<Record<number, Set<number>>>({});
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [error, setError] = useState<string | null>(null);
 
   const toggleItem = (categoryId: number, itemId: number) => {
     setSelected((prev) => {
@@ -33,6 +49,44 @@ export default function Composer({ categories, items }: Props) {
   }, [categoriesWithItems, selected]);
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
+
+  const startBatch = async () => {
+    const webview = document.getElementById('generator') as Electron.WebviewTag | null;
+    if (!webview) {
+      setError('Generator webview not found');
+      return;
+    }
+
+    const combos = cartesianProduct(categoriesWithItems, selected);
+    setRunning(true);
+    setError(null);
+    setProgress({ done: 0, total: combos.length });
+
+    for (const combo of combos) {
+      const promptText = categoriesWithItems
+        .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
+        .filter((fragment): fragment is string => Boolean(fragment))
+        .join(', ');
+
+      try {
+        // eslint-disable-next-line no-await-in-loop -- generations must run sequentially, one page at a time
+        const result = await generateImage(webview, promptText);
+        // eslint-disable-next-line no-await-in-loop
+        await window.promptloom.saveGeneration(
+          promptText,
+          combo,
+          result.seed,
+          result.imageDataUrl,
+        );
+        setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        break;
+      }
+    }
+
+    setRunning(false);
+  };
 
   return (
     <div>
@@ -68,7 +122,13 @@ export default function Composer({ categories, items }: Props) {
           ? `${combinationCount} combination${combinationCount === 1 ? '' : 's'} queued`
           : 'Select at least one item in every category to queue a batch.'}
       </p>
-      <button disabled title="Browser driving isn't wired up yet">
+      {running && (
+        <p className="hint">
+          Running {progress.done}/{progress.total}...
+        </p>
+      )}
+      {error && <p className="error">{error}</p>}
+      <button onClick={startBatch} disabled={!readyToRun || running}>
         Start batch
       </button>
     </div>

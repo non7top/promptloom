@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Category, Item } from '../shared/types';
 import DefinitionManager from './DefinitionManager';
 import Composer from './Composer';
+import Gallery from './Gallery';
 
-type Tab = 'definitions' | 'composer';
+type Tab = 'definitions' | 'composer' | 'gallery';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('definitions');
@@ -56,12 +57,15 @@ export default function App() {
         <button className={tab === 'composer' ? 'active' : ''} onClick={() => setTab('composer')}>
           Composer
         </button>
+        <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
+          Gallery
+        </button>
       </nav>
-      {tab === 'definitions' ? (
+      {tab === 'definitions' && (
         <DefinitionManager categories={categories} items={items} onChange={reload} />
-      ) : (
-        <Composer categories={categories} items={items} />
       )}
+      {tab === 'composer' && <Composer categories={categories} items={items} />}
+      {tab === 'gallery' && <Gallery />}
     </div>
   );
 }
