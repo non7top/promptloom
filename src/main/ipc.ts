@@ -2,8 +2,10 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as db from './db';
-import { generateImage } from './perchanceDriver';
+import { populatePrompt, extractSeed, extractCapturedPrompt } from './perchanceDriver';
 import { getLastPerchanceStatus } from './perchanceView';
+
+let currentStash = 'Unsorted';
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('categories:list', () => db.listCategories());
@@ -59,9 +61,26 @@ export function registerIpcHandlers(): void {
     return filePath;
   });
 
-  ipcMain.handle('driver:generateImage', (_event, promptText: string) =>
-    generateImage(promptText),
+  ipcMain.handle('driver:populatePrompt', (_event, promptText: string) =>
+    populatePrompt(promptText),
   );
 
   ipcMain.handle('perchance:getStatus', () => getLastPerchanceStatus());
+
+  ipcMain.handle('stash:setCurrent', (_event, name: string) => {
+    currentStash = name;
+  });
+
+  // Fire-and-forget from the page's injected save button (via
+  // perchancePreload.ts's bridge) — not a request/response, so `.on` rather
+  // than `.handle`. The image data and its embedded prompt/seed are read
+  // from the page itself, not tracked by us, since a manually-saved image
+  // might not correspond to whatever we last populated (the user may have
+  // tweaked the prompt, or be saving an older result from the page's own
+  // history).
+  ipcMain.on('perchance:saveImage', (_event, src: string, title: string) => {
+    const seed = extractSeed(title);
+    const capturedPrompt = extractCapturedPrompt(title) ?? '(prompt unavailable)';
+    db.saveGeneration(currentStash, capturedPrompt, {}, seed, src);
+  });
 }

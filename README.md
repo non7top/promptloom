@@ -11,13 +11,17 @@ See [project.md](project.md) for the original brief.
 
 - Define reusable categories (pose, clothes, character, smile, ...) and the
   items within them.
-- Compose a batch by selecting one or more items per category; PromptLoom
-  queues every combination.
-- An embedded browser (Electron's Chromium) drives the actual perchance page:
-  injecting the composed prompt, clicking Generate, and capturing the
-  resulting image + seed once ready.
-- Everything is stored locally (SQLite + image files) so past generations are
-  searchable and reproducible by seed.
+- In the Composer, select one or more items per category and name a
+  "stash" (a named group for whatever you're about to generate), then hit
+  Start. PromptLoom populates the perchance prompt field for the first
+  combination — you review it and click Generate yourself.
+- Once images appear, a ⭐💾 button PromptLoom adds next to perchance's own
+  per-image save button lets you keep only the ones you actually like —
+  click "Populate next prompt" to move to the next combination.
+- Saving reads the prompt and seed directly from the image itself (perchance
+  embeds both), so what's stored is always exactly what was submitted, not
+  just what PromptLoom composed. Everything lands in the Gallery grouped by
+  stash, stored locally (SQLite + image files) and reproducible by seed.
 
 perchance.org sits behind a Cloudflare bot check. PromptLoom persists the
 browser session (cookies) across restarts, so you only need to clear that
