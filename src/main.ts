@@ -57,7 +57,11 @@ const createWindow = () => {
   perchanceView.webContents.on('did-finish-load', () => {
     sendStatus({ connected: true, url: perchanceView.webContents.getURL() });
   });
-  perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription) => {
+  perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription, _url, isMainFrame) => {
+    // did-fail-load fires for any failed resource (ads, trackers, fonts,
+    // subframes), not just the page itself — only surface this as a real
+    // failure when the main frame is what failed.
+    if (!isMainFrame) return;
     sendStatus({ connected: false, error: errorDescription });
   });
 };
