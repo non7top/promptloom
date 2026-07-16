@@ -17,6 +17,15 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
   mainWindow.contentView.addChildView(newView);
   newView.webContents.loadURL(PERCHANCE_URL);
 
+  // Unlike a top-level BrowserWindow, a WebContentsView doesn't apply
+  // Ctrl+scroll-wheel zoom automatically — 'zoom-changed' fires the request,
+  // but applying it is left to the app.
+  newView.webContents.on('zoom-changed', (_event, zoomDirection) => {
+    const current = newView.webContents.getZoomFactor();
+    const delta = zoomDirection === 'in' ? 0.1 : -0.1;
+    newView.webContents.setZoomFactor(Math.min(Math.max(current + delta, 0.25), 3));
+  });
+
   const updateBounds = () => {
     const [width, height] = mainWindow.getContentSize();
     newView.setBounds({
