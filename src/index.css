@@ -70,6 +70,34 @@ body {
   padding: 0.15rem 0;
 }
 
+.error {
+  color: #b00020;
+  font-size: 0.85rem;
+}
+
+.gallery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gallery li {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.gallery img {
+  max-width: 100%;
+  display: block;
+  border: 1px solid #999;
+  /* Checkerboard so transparent-background generations stay visible
+     regardless of the surrounding panel color. */
+  background:
+    repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+}
+
 webview {
   flex: 1;
 }

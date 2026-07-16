@@ -19,4 +19,17 @@ export function registerIpcHandlers(): void {
     db.updateItem(id, name, promptFragment),
   );
   ipcMain.handle('items:delete', (_event, id: number) => db.deleteItem(id));
+
+  ipcMain.handle('generations:list', () => db.listGenerations());
+  ipcMain.handle(
+    'generations:save',
+    (
+      _event,
+      promptText: string,
+      selection: Record<number, number>,
+      seed: string | null,
+      imageDataUrl: string,
+    ) => db.saveGeneration(promptText, selection, seed, imageDataUrl),
+  );
+  ipcMain.handle('generations:delete', (_event, id: number) => db.deleteGeneration(id));
 }

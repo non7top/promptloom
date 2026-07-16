@@ -1,8 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
 import path from 'node:path';
-import type { Category, Item } from '../shared/types';
+import { pathToFileURL } from 'node:url';
+import type { Category, Item, Generation } from '../shared/types';
 
 let db: DatabaseSync;
+let imagesDir: string;
 
 export function initDb(userDataPath: string): void {
   db = new DatabaseSync(path.join(userDataPath, 'promptloom.sqlite'));
@@ -18,7 +21,18 @@ export function initDb(userDataPath: string): void {
       name TEXT NOT NULL,
       prompt_fragment TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS generations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      prompt_text TEXT NOT NULL,
+      selection_json TEXT NOT NULL,
+      seed TEXT,
+      image_path TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
+
+  imagesDir = path.join(userDataPath, 'images');
+  fs.mkdirSync(imagesDir, { recursive: true });
 }
 
 export function listCategories(): Category[] {
@@ -73,4 +87,68 @@ export function updateItem(id: number, name: string, promptFragment: string): vo
 
 export function deleteItem(id: number): void {
   db.prepare('DELETE FROM items WHERE id = ?').run(id);
+}
+
+export function listGenerations(): Generation[] {
+  const rows = db
+    .prepare(
+      'SELECT id, prompt_text, selection_json, seed, image_path, created_at FROM generations ORDER BY id DESC',
+    )
+    .all() as {
+    id: number;
+    prompt_text: string;
+    selection_json: string;
+    seed: string | null;
+    image_path: string;
+    created_at: string;
+  }[];
+  return rows.map((row) => ({
+    id: row.id,
+    promptText: row.prompt_text,
+    selection: JSON.parse(row.selection_json),
+    seed: row.seed,
+    imagePath: row.image_path,
+    imageUrl: pathToFileURL(row.image_path).href,
+    createdAt: row.created_at,
+  }));
+}
+
+export function saveGeneration(
+  promptText: string,
+  selection: Record<number, number>,
+  seed: string | null,
+  imageDataUrl: string,
+): Generation {
+  const createdAt = new Date().toISOString();
+  const { lastInsertRowid } = db
+    .prepare(
+      'INSERT INTO generations (prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?)',
+    )
+    .run(promptText, JSON.stringify(selection), seed, '', createdAt);
+  const id = Number(lastInsertRowid);
+
+  const imagePath = path.join(imagesDir, `${id}.png`);
+  const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'));
+  db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
+
+  return {
+    id,
+    promptText,
+    selection,
+    seed,
+    imagePath,
+    imageUrl: pathToFileURL(imagePath).href,
+    createdAt,
+  };
+}
+
+export function deleteGeneration(id: number): void {
+  const row = db.prepare('SELECT image_path FROM generations WHERE id = ?').get(id) as
+    | { image_path: string }
+    | undefined;
+  db.prepare('DELETE FROM generations WHERE id = ?').run(id);
+  if (row?.image_path) {
+    fs.rmSync(row.image_path, { force: true });
+  }
 }
