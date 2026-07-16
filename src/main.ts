@@ -1,8 +1,16 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers } from './main/ipc';
+
+// Electron shows no right-click menu anywhere by default (unlike a normal
+// browser) — this adds the standard cut/copy/paste/inspect-element menu,
+// including inside the embedded <webview>.
+contextMenu({
+  showInspectElement: true,
+});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {

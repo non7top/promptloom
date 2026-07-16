@@ -43,6 +43,23 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const webview = document.getElementById('generator') as Electron.WebviewTag | null;
+    if (!webview) return;
+
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? -0.1 : 0.1;
+      const next = Math.min(Math.max(webview.getZoomFactor() + delta, 0.25), 3);
+      webview.setZoomFactor(next);
+    };
+
+    const target = webview as unknown as HTMLElement;
+    target.addEventListener('wheel', onWheel, { passive: false });
+    return () => target.removeEventListener('wheel', onWheel);
+  }, []);
+
   return (
     <div>
       <h1>PromptLoom</h1>

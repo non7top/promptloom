@@ -14,6 +14,7 @@ function groupByLabel(generations: Generation[]): [string, Generation[]][] {
 
 export default function Gallery() {
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [confirmingLabel, setConfirmingLabel] = useState<string | null>(null);
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -35,8 +36,8 @@ export default function Gallery() {
   };
 
   const removeGroup = async (label: string) => {
-    if (!window.confirm(`Delete all images grouped under "${label}"?`)) return;
     await window.promptloom.deleteBatch(label);
+    setConfirmingLabel(null);
     reload();
   };
 
@@ -50,7 +51,15 @@ export default function Gallery() {
         <section className="category" key={label}>
           <header>
             <strong>{label}</strong>
-            <button onClick={() => removeGroup(label)}>Delete group</button>
+            {confirmingLabel === label ? (
+              <>
+                <span className="hint">Delete this whole group?</span>
+                <button onClick={() => removeGroup(label)}>Yes</button>
+                <button onClick={() => setConfirmingLabel(null)}>No</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmingLabel(label)}>Delete group</button>
+            )}
           </header>
           <ul className="gallery">
             {group.map((generation) => (
