@@ -1,4 +1,4 @@
-import type { WebContents } from 'electron';
+import type { WebFrameMain } from 'electron';
 import type { GenerationResult } from '../shared/types';
 import { getPerchanceWebContents } from './perchanceView';
 
@@ -12,6 +12,12 @@ interface ImageProbe {
 // - generate button: <button id="generateButtonEl">
 // - result: <img id="resultImgEl">, whose `src` is already a data: URL and
 //   whose `title` embeds "seed=<n>" alongside the full prompt used.
+//
+// The generator itself may run inside a nested <iframe> rather than the
+// top-level document (common for perchance.org, which wraps generators in
+// a shell page) — document.querySelector from the main frame won't see
+// into that, even though the elements are visibly on screen. Search every
+// frame in the page for the one that actually contains these elements.
 const PROMPT_SELECTOR = 'textarea[data-name="description"]';
 const GENERATE_BUTTON_SELECTOR = '#generateButtonEl';
 const RESULT_IMAGE_SELECTOR = '#resultImgEl';
@@ -31,13 +37,38 @@ function extractCapturedPrompt(title: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-async function probeResultImage(webContents: WebContents): Promise<ImageProbe | null> {
-  return webContents.executeJavaScript(`
+async function frameHasSelector(frame: WebFrameMain, selector: string): Promise<boolean> {
+  try {
+    return Boolean(
+      await frame.executeJavaScript(`!!document.querySelector(${JSON.stringify(selector)})`),
+    );
+  } catch {
+    // Cross-origin or destroyed frames can throw; treat as "not found".
+    return false;
+  }
+}
+
+async function findGeneratorFrame(): Promise<WebFrameMain> {
+  const webContents = getPerchanceWebContents();
+  for (const frame of webContents.mainFrame.framesInSubtree) {
+    // eslint-disable-next-line no-await-in-loop -- frames must be checked sequentially
+    if (await frameHasSelector(frame, PROMPT_SELECTOR)) {
+      return frame;
+    }
+  }
+  throw new Error(
+    'Prompt textarea not found in any frame of the perchance page (still on the ' +
+      'Cloudflare check, or the page structure has changed)',
+  );
+}
+
+async function probeResultImage(frame: WebFrameMain): Promise<ImageProbe | null> {
+  return frame.executeJavaScript(`
     (() => {
       const img = document.querySelector(${JSON.stringify(RESULT_IMAGE_SELECTOR)});
       return img ? { title: img.title, src: img.src } : null;
     })();
-  `);
+  `) as Promise<ImageProbe | null>;
 }
 
 // Never throw inside injected code: executeJavaScript() doesn't propagate
@@ -45,10 +76,10 @@ async function probeResultImage(webContents: WebContents): Promise<ImageProbe | 
 // "Script failed to execute" wrapper. Return a result object instead and
 // raise the real error in normal TS code below.
 async function injectPromptAndClickGenerate(
-  webContents: WebContents,
+  frame: WebFrameMain,
   promptText: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  return webContents.executeJavaScript(`
+  return frame.executeJavaScript(`
     (() => {
       try {
         const textarea = document.querySelector(${JSON.stringify(PROMPT_SELECTOR)});
@@ -64,7 +95,7 @@ async function injectPromptAndClickGenerate(
         return { ok: false, error: String((err && err.message) || err) };
       }
     })();
-  `);
+  `) as Promise<{ ok: boolean; error?: string }>;
 }
 
 /**
@@ -73,17 +104,17 @@ async function injectPromptAndClickGenerate(
  * them from the resulting <img>'s `src`/`title`.
  */
 export async function generateImage(promptText: string): Promise<GenerationResult> {
-  const webContents = getPerchanceWebContents();
-  const before = await probeResultImage(webContents);
+  const frame = await findGeneratorFrame();
+  const before = await probeResultImage(frame);
 
-  const injected = await injectPromptAndClickGenerate(webContents, promptText);
+  const injected = await injectPromptAndClickGenerate(frame, promptText);
   if (!injected.ok) {
     throw new Error(injected.error ?? 'Failed to inject prompt and click Generate');
   }
 
   const deadline = Date.now() + TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const current = await probeResultImage(webContents);
+    const current = await probeResultImage(frame);
     if (current && current.title !== before?.title && current.src.startsWith('data:image')) {
       return {
         imageDataUrl: current.src,
