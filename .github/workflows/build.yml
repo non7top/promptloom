@@ -39,27 +39,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Compute short SHA
+        id: vars
+        shell: bash
+        run: echo "sha_short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
       - name: Package Windows installer
         run: npm run make
 
       - name: Upload installer (Setup.exe)
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-installer-${{ github.sha }}
+          name: promptloom-installer-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/*.exe
           retention-days: 14
 
       - name: Upload update package (.nupkg)
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-nupkg-${{ github.sha }}
+          name: promptloom-nupkg-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/*.nupkg
           retention-days: 14
 
       - name: Upload RELEASES manifest
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-releases-${{ github.sha }}
+          name: promptloom-releases-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/RELEASES
           retention-days: 14
 
@@ -70,4 +75,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ github.sha }}\`: download the \`promptloom-installer-*\`, \`promptloom-nupkg-*\`, and \`promptloom-releases-*\` artifacts from $RUN_URL (scroll to Artifacts at the bottom)."
+          gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`: download the \`promptloom-installer-*\`, \`promptloom-nupkg-*\`, and \`promptloom-releases-*\` artifacts from $RUN_URL (scroll to Artifacts at the bottom)."
