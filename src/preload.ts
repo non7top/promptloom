@@ -15,9 +15,11 @@ const api: PromptLoomApi = {
   deleteItem: (id) => ipcRenderer.invoke('items:delete', id),
 
   listGenerations: () => ipcRenderer.invoke('generations:list'),
-  saveGeneration: (promptText, selection, seed, imageDataUrl) =>
-    ipcRenderer.invoke('generations:save', promptText, selection, seed, imageDataUrl),
+  saveGeneration: (batchLabel, promptText, selection, seed, imageDataUrl) =>
+    ipcRenderer.invoke('generations:save', batchLabel, promptText, selection, seed, imageDataUrl),
   deleteGeneration: (id) => ipcRenderer.invoke('generations:delete', id),
+  deleteBatch: (batchLabel) => ipcRenderer.invoke('generations:deleteBatch', batchLabel),
+  saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
 };
 
 contextBridge.exposeInMainWorld('promptloom', api);
