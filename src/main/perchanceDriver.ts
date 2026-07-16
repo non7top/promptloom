@@ -22,7 +22,10 @@ const PROMPT_SELECTOR = 'textarea[data-name="description"]';
 const GENERATE_BUTTON_SELECTOR = '#generateButtonEl';
 const RESULT_IMAGE_SELECTOR = '#resultImgEl';
 const POLL_INTERVAL_MS = 500;
-const TIMEOUT_MS = 60_000;
+// AI image generation can genuinely take close to a minute for a long,
+// detailed prompt — 60s was tight enough to time out on generations that
+// went on to complete successfully seconds later.
+const TIMEOUT_MS = 180_000;
 
 function extractSeed(title: string): string | null {
   const match = title.match(/seed=(\d+)/);
