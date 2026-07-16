@@ -57,6 +57,14 @@ const createWindow = () => {
   };
   perchanceView.webContents.on('did-finish-load', () => {
     sendStatus({ connected: true, url: perchanceView.webContents.getURL() });
+  });
+  // The generator itself typically lives in a nested iframe that finishes
+  // loading independently of (and often after) the top-level page — and
+  // often well after the user finishes manually clearing the Cloudflare
+  // check, which did-finish-load alone can't account for. did-frame-
+  // finish-load fires for every frame, main or sub, whenever any of them
+  // navigates, so retry injection each time.
+  perchanceView.webContents.on('did-frame-finish-load', () => {
     injectSaveButtons();
   });
   perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription, _url, isMainFrame) => {
