@@ -1,7 +1,7 @@
 {
   "name": "promptloom",
   "productName": "PromptLoom",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Batch-compose and generate images on perchance.org's AI text-to-image generator from reusable pose/clothes/character/smile definitions, capturing seeds for reproducibility.",
   "main": ".vite/build/main.js",
   "private": true,
