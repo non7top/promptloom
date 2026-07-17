@@ -1,3 +1,5 @@
+name: promptloom
+
 services:
   dev:
     build:
