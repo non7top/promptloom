@@ -21,7 +21,8 @@ const api: PromptLoomApi = {
   deleteBatch: (batchLabel) => ipcRenderer.invoke('generations:deleteBatch', batchLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
 
-  generateImage: (promptText) => ipcRenderer.invoke('driver:generateImage', promptText),
+  populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
+  setCurrentStash: (name) => ipcRenderer.invoke('stash:setCurrent', name),
   onPerchanceStatus: (callback) => {
     // The view may have already fired its first load event before this
     // subscribes — fetch the cached status once up front so that event

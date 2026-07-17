@@ -1,4 +1,5 @@
 import { BrowserWindow, WebContentsView, session, WebContents } from 'electron';
+import path from 'node:path';
 import type { PerchanceStatus } from '../shared/types';
 
 const PERCHANCE_URL = 'https://perchance.org/ai-text-to-image-generator';
@@ -11,6 +12,7 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
   const newView = new WebContentsView({
     webPreferences: {
       session: session.fromPartition('persist:perchance'),
+      preload: path.join(__dirname, 'perchancePreload.js'),
     },
   });
   view = newView;

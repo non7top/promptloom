@@ -20,8 +20,9 @@ function cartesianProduct(
 
 export default function Composer({ categories, items }: Props) {
   const [selected, setSelected] = useState<Record<number, Set<number>>>({});
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [stashName, setStashName] = useState('');
+  const [combos, setCombos] = useState<Record<number, number>[] | null>(null);
+  const [comboIndex, setComboIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const toggleItem = (categoryId: number, itemId: number) => {
@@ -49,38 +50,42 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  const startBatch = async () => {
-    const combos = cartesianProduct(categoriesWithItems, selected);
-    setRunning(true);
-    setError(null);
-    setProgress({ done: 0, total: combos.length });
+  const promptTextFor = (combo: Record<number, number>): string =>
+    categoriesWithItems
+      .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
+      .filter((fragment): fragment is string => Boolean(fragment))
+      .join(', ');
 
-    for (const combo of combos) {
-      const comboItems = categoriesWithItems
-        .map((category) => items.find((item) => item.id === combo[category.id]))
-        .filter((item): item is Item => Boolean(item));
-      const promptText = comboItems.map((item) => item.promptFragment).join(', ');
-      const groupLabel = comboItems.map((item) => item.name).join(' - ') || 'Unsorted';
-
-      try {
-        // eslint-disable-next-line no-await-in-loop -- generations must run sequentially, one page at a time
-        const result = await window.promptloom.generateImage(promptText);
-        // eslint-disable-next-line no-await-in-loop
-        await window.promptloom.saveGeneration(
-          groupLabel,
-          result.capturedPrompt ?? promptText,
-          combo,
-          result.seed,
-          result.imageDataUrl,
-        );
-        setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-        break;
-      }
+  const populate = async (combo: Record<number, number>) => {
+    try {
+      await window.promptloom.populatePrompt(promptTextFor(combo));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
+  };
 
-    setRunning(false);
+  const start = async () => {
+    const name = stashName.trim() || `Stash ${new Date().toLocaleString()}`;
+    setStashName(name);
+    await window.promptloom.setCurrentStash(name);
+    const generated = cartesianProduct(categoriesWithItems, selected);
+    setCombos(generated);
+    setComboIndex(0);
+    await populate(generated[0]);
+  };
+
+  const next = async () => {
+    if (!combos) return;
+    const nextIndex = comboIndex + 1;
+    if (nextIndex >= combos.length) return;
+    setComboIndex(nextIndex);
+    await populate(combos[nextIndex]);
+  };
+
+  const stop = () => {
+    setCombos(null);
+    setError(null);
   };
 
   return (
@@ -103,6 +108,7 @@ export default function Composer({ categories, items }: Props) {
                       type="checkbox"
                       checked={selected[category.id]?.has(item.id) ?? false}
                       onChange={() => toggleItem(category.id, item.id)}
+                      disabled={combos !== null}
                     />
                     {item.name}
                   </label>
@@ -112,20 +118,41 @@ export default function Composer({ categories, items }: Props) {
         </section>
       ))}
 
-      <p>
-        {readyToRun
-          ? `${combinationCount} combination${combinationCount === 1 ? '' : 's'} queued`
-          : 'Select at least one item in every category to queue a batch.'}
-      </p>
-      {running && (
-        <p className="hint">
-          Running {progress.done}/{progress.total}...
-        </p>
+      <input
+        value={stashName}
+        onChange={(e) => setStashName(e.target.value)}
+        placeholder="Stash name (e.g. Hermione outfits)"
+        disabled={combos !== null}
+      />
+
+      {combos === null ? (
+        <>
+          <p>
+            {readyToRun
+              ? `${combinationCount} combination${combinationCount === 1 ? '' : 's'} ready`
+              : 'Select at least one item in every category to start.'}
+          </p>
+          <button onClick={start} disabled={!readyToRun}>
+            Start
+          </button>
+        </>
+      ) : (
+        <>
+          <p>
+            Combination {comboIndex + 1} of {combos.length}
+          </p>
+          <p className="hint">
+            Prompt populated on the page — click Generate there yourself, then click perchance&apos;s
+            own 🛡️💾 save button under any image you want to keep. Saved images land in the
+            Gallery under &quot;{stashName}&quot;.
+          </p>
+          <button onClick={next} disabled={comboIndex + 1 >= combos.length}>
+            Populate next prompt
+          </button>
+          <button onClick={stop}>Stop</button>
+        </>
       )}
       {error && <p className="error">{error}</p>}
-      <button onClick={startBatch} disabled={!readyToRun || running}>
-        Start batch
-      </button>
     </div>
   );
 }
