@@ -13,6 +13,11 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
     webPreferences: {
       session: session.fromPartition('persist:perchance'),
       preload: path.join(__dirname, 'perchancePreload.js'),
+      // The generator itself lives in a nested <iframe>, not the top-level
+      // frame — Electron only loads a preload script into the main frame
+      // by default, so window.promptloomBridge would otherwise never exist
+      // where the save-button listener actually needs it.
+      nodeIntegrationInSubFrames: true,
     },
   });
   view = newView;
