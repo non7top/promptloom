@@ -1,13 +1,18 @@
 import type { WebFrameMain } from 'electron';
 import { getPerchanceWebContents } from './perchanceView';
 
-// perchance's generator page structure (confirmed by hand, 2026-07-16):
+// perchance's generator page structure (confirmed by hand, 2026-07-16,
+// including the real source of window.t2i_privateGallerySave):
 // - prompt input: <textarea data-name="description">
-// - each result sits in a <div class="t2i-image-ctn"> containing an <img>
-//   whose `src` is already a data: URL and whose `title` embeds
-//   "seed=<n>" alongside the full prompt used, plus perchance's own
-//   "private save" button calling a global window.t2i_privateGallerySave(
-//   buttonEl, containerEl) function.
+// - each result sits in a <div class="t2i-image-ctn"> containing a nested
+//   <iframe>. The actual generation data lives as a property the plugin
+//   attaches directly to that iframe element —
+//   iframe.textToImagePluginOutput = { dataUrl, inputs: { prompt,
+//   negativePrompt, seed, guidanceScale } } — not on any <img> tag, and
+//   not encoded as a string anywhere.
+// - perchance's own "private save" button calls a global
+//   window.t2i_privateGallerySave(buttonEl, containerEl) function that
+//   reads exactly that property.
 //
 // The generator itself may run inside a nested <iframe> rather than the
 // top-level document (common for perchance.org, which wraps generators in
@@ -17,19 +22,6 @@ import { getPerchanceWebContents } from './perchanceView';
 const PROMPT_SELECTOR = 'textarea[data-name="description"]';
 const FRAME_SEARCH_RETRIES = 10;
 const FRAME_SEARCH_RETRY_DELAY_MS = 500;
-
-export function extractSeed(title: string): string | null {
-  const match = title.match(/seed=(\d+)/);
-  return match ? match[1] : null;
-}
-
-// The title also embeds the exact prompt actually submitted (may differ
-// subtly from what we sent, e.g. trimming) — more authoritative than any
-// locally-composed string, and saves having to remember it separately.
-export function extractCapturedPrompt(title: string): string | null {
-  const match = title.match(/prompt=([\s\S]*?)\nnegativePrompt=/);
-  return match ? match[1].trim() : null;
-}
 
 async function frameHasSelector(frame: WebFrameMain, selector: string): Promise<boolean> {
   try {
@@ -94,10 +86,10 @@ export async function populatePrompt(promptText: string): Promise<void> {
 // an injected sibling isn't part of that framework's own DOM — wrap the
 // *global function* perchance's existing "private save" button already
 // calls. Clicking perchance's own save button then also hands that
-// image's src/title to the main process via the bridge exposed by
-// perchancePreload.ts (see ipc.ts's 'perchance:saveImage' handler) — the
-// main process, not this script, decides what to do with it, since this
-// code runs in perchance's own untrusted page.
+// image's data + prompt/seed to the main process via the bridge exposed
+// by perchancePreload.ts (see ipc.ts's 'perchance:saveImage' handler) —
+// the main process, not this script, decides what to do with it, since
+// this code runs in perchance's own untrusted page.
 //
 // A JS reference doesn't get discarded by a DOM re-render the way an
 // injected element does, but the site's own per-render init code appears
@@ -112,10 +104,17 @@ const INTERCEPT_SAVE_FUNCTION_SCRIPT = `
     const original = window.t2i_privateGallerySave;
     if (typeof original !== 'function' || original.__promptloomWrapped) return;
     const wrapped = function (buttonEl, containerEl) {
-      const result = original.apply(this, arguments);
-      const img = containerEl && containerEl.querySelector ? containerEl.querySelector('img') : null;
-      if (img) window.promptloomBridge.saveImage(img.src, img.title);
-      return result;
+      try {
+        const iframe = containerEl && containerEl.querySelector ? containerEl.querySelector('iframe') : null;
+        const output = iframe && iframe.textToImagePluginOutput;
+        if (output && output.dataUrl && output.inputs) {
+          const seed = output.inputs.seed != null ? String(output.inputs.seed) : null;
+          window.promptloomBridge.saveImage(output.dataUrl, output.inputs.prompt || '', seed);
+        }
+      } catch (err) {
+        console.error('[PromptLoom] failed to capture image for save', err);
+      }
+      return original.apply(this, arguments);
     };
     wrapped.__promptloomWrapped = true;
     window.t2i_privateGallerySave = wrapped;
