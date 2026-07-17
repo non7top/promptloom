@@ -30,6 +30,16 @@ if (process.env.PROMPTLOOM_DISABLE_GPU) {
   app.commandLine.appendSwitch('disable-software-rasterizer');
 }
 
+// Opt-in only — this opens an unauthenticated CDP endpoint that lets any
+// local process (or, if tunneled/forwarded, anything upstream of that
+// tunnel) fully control the app. Only for use while actively debugging.
+if (process.env.PROMPTLOOM_REMOTE_DEBUGGING_PORT) {
+  app.commandLine.appendSwitch(
+    'remote-debugging-port',
+    process.env.PROMPTLOOM_REMOTE_DEBUGGING_PORT,
+  );
+}
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({

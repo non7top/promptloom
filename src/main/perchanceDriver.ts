@@ -87,13 +87,12 @@ export async function populatePrompt(promptText: string): Promise<void> {
 // addEventListener-bound listener(s), which may hold a closured reference
 // to the original function rather than looking up window.
 // t2i_privateGallerySave fresh, making our wrap irrelevant to whichever
-// listener actually fires. Attaching our own capture-phase click listener
-// directly on the button sidesteps that uncertainty entirely — it fires
-// regardless of what other listeners exist or how they're wired, and we
-// read the generation data ourselves rather than depending on perchance's
-// own function at all. Still needs the same "keep re-attaching" treatment
-// as the DOM-button approach, since the button element itself can get
-// replaced by a re-render.
+// listener actually fires. Instead, we attach to the actual button, first
+// stripping every listener perchance itself attached (see attach() below),
+// and read the generation data ourselves rather than depending on
+// perchance's own function at all. Still needs the same "keep re-attaching"
+// treatment as any injected-DOM approach, since the button element itself
+// can get replaced by a re-render.
 const ATTACH_SAVE_LISTENER_SCRIPT = `
 (() => {
   function captureAndSave(container) {
@@ -111,12 +110,18 @@ const ATTACH_SAVE_LISTENER_SCRIPT = `
 
   function attach(button) {
     if (button.__promptloomListenerAttached) return;
-    button.__promptloomListenerAttached = true;
-    button.addEventListener(
-      'click',
-      () => captureAndSave(button.closest('.t2i-image-ctn')),
-      true, // capture phase: fires regardless of other listeners/order
-    );
+    // Racing perchance's own listener(s) with just a capture-phase listener
+    // isn't reliable — same-target listeners run in registration order
+    // regardless of capture/bubble, and the site's own listener is very
+    // likely attached before ours gets a chance to. Cloning drops every
+    // addEventListener-bound listener the original had, and removing the
+    // onclick attribute drops the inline handler too, so the clone truly
+    // has none of the site's own behavior left — only ours.
+    const clone = button.cloneNode(true);
+    clone.removeAttribute('onclick');
+    clone.__promptloomListenerAttached = true;
+    button.replaceWith(clone);
+    clone.addEventListener('click', () => captureAndSave(clone.closest('.t2i-image-ctn')));
   }
 
   function scan() {
