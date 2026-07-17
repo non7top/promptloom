@@ -53,6 +53,10 @@ jobs:
           name: promptloom-installer-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/*.exe
           retention-days: 14
+          # Setup.exe is already a compressed archive internally — re-
+          # compressing it into the artifact zip just burns CPU for no
+          # real size benefit.
+          compression-level: 0
 
       - name: Upload update package (.nupkg)
         uses: actions/upload-artifact@v7
