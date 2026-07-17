@@ -81,48 +81,52 @@ export async function populatePrompt(promptText: string): Promise<void> {
   }
 }
 
-// Rather than injecting a new button into the DOM — which the site's own
-// JS silently wipes out whenever it re-renders a result container, since
-// an injected sibling isn't part of that framework's own DOM — wrap the
-// *global function* perchance's existing "private save" button already
-// calls. Clicking perchance's own save button then also hands that
-// image's data + prompt/seed to the main process via the bridge exposed
-// by perchancePreload.ts (see ipc.ts's 'perchance:saveImage' handler) —
-// the main process, not this script, decides what to do with it, since
-// this code runs in perchance's own untrusted page.
-//
-// A JS reference doesn't get discarded by a DOM re-render the way an
-// injected element does, but the site's own per-render init code appears
-// to re-assign window.t2i_privateGallerySave fresh each time (plausible
-// for a per-instance-setup pattern) — a wrapped reference from an earlier
-// render otherwise gets silently clobbered back to the unwrapped original.
-// So this keeps re-checking indefinitely rather than wrapping once and
-// stopping, same fix as the DOM-button approach needed.
-const INTERCEPT_SAVE_FUNCTION_SCRIPT = `
+// Wrapping window.t2i_privateGallerySave (a JS reference, not a DOM node)
+// was meant to sidestep the site's own re-renders wiping out an injected
+// button — but DevTools showed the save button also has its own
+// addEventListener-bound listener(s), which may hold a closured reference
+// to the original function rather than looking up window.
+// t2i_privateGallerySave fresh, making our wrap irrelevant to whichever
+// listener actually fires. Attaching our own capture-phase click listener
+// directly on the button sidesteps that uncertainty entirely — it fires
+// regardless of what other listeners exist or how they're wired, and we
+// read the generation data ourselves rather than depending on perchance's
+// own function at all. Still needs the same "keep re-attaching" treatment
+// as the DOM-button approach, since the button element itself can get
+// replaced by a re-render.
+const ATTACH_SAVE_LISTENER_SCRIPT = `
 (() => {
-  function wrap() {
-    const original = window.t2i_privateGallerySave;
-    if (typeof original !== 'function' || original.__promptloomWrapped) return;
-    const wrapped = function (buttonEl, containerEl) {
-      try {
-        const iframe = containerEl && containerEl.querySelector ? containerEl.querySelector('iframe') : null;
-        const output = iframe && iframe.textToImagePluginOutput;
-        if (output && output.dataUrl && output.inputs) {
-          const seed = output.inputs.seed != null ? String(output.inputs.seed) : null;
-          window.promptloomBridge.saveImage(output.dataUrl, output.inputs.prompt || '', seed);
-        }
-      } catch (err) {
-        console.error('[PromptLoom] failed to capture image for save', err);
+  function captureAndSave(container) {
+    try {
+      const iframe = container && container.querySelector ? container.querySelector('iframe') : null;
+      const output = iframe && iframe.textToImagePluginOutput;
+      if (output && output.dataUrl && output.inputs) {
+        const seed = output.inputs.seed != null ? String(output.inputs.seed) : null;
+        window.promptloomBridge.saveImage(output.dataUrl, output.inputs.prompt || '', seed);
       }
-      return original.apply(this, arguments);
-    };
-    wrapped.__promptloomWrapped = true;
-    window.t2i_privateGallerySave = wrapped;
+    } catch (err) {
+      console.error('[PromptLoom] failed to capture image for save', err);
+    }
   }
 
-  wrap();
-  if (window.__promptloomWrapInterval) return;
-  window.__promptloomWrapInterval = setInterval(wrap, 500);
+  function attach(button) {
+    if (button.__promptloomListenerAttached) return;
+    button.__promptloomListenerAttached = true;
+    button.addEventListener(
+      'click',
+      () => captureAndSave(button.closest('.t2i-image-ctn')),
+      true, // capture phase: fires regardless of other listeners/order
+    );
+  }
+
+  function scan() {
+    document.querySelectorAll('.private-save-button').forEach(attach);
+  }
+
+  scan();
+  if (window.__promptloomScanInterval) return;
+  window.__promptloomScanInterval = setInterval(scan, 1000);
+  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
 })();
 `;
 
@@ -132,7 +136,7 @@ export async function injectSaveButtons(): Promise<void> {
     const frame = await findFrameWithSelector(PROMPT_SELECTOR);
     if (frame) {
       // eslint-disable-next-line no-await-in-loop
-      await frame.executeJavaScript(INTERCEPT_SAVE_FUNCTION_SCRIPT);
+      await frame.executeJavaScript(ATTACH_SAVE_LISTENER_SCRIPT);
       return;
     }
     // eslint-disable-next-line no-await-in-loop -- retries must happen sequentially
@@ -143,5 +147,5 @@ export async function injectSaveButtons(): Promise<void> {
   // it and the next frame-load retry succeeds, so this is logged rather
   // than thrown.
   // eslint-disable-next-line no-console
-  console.warn('[perchanceDriver] Gave up looking for the generator frame to intercept the save function in');
+  console.warn('[perchanceDriver] Gave up looking for the generator frame to attach the save listener in');
 }
