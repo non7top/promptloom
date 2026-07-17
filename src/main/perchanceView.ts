@@ -13,6 +13,11 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
     webPreferences: {
       session: session.fromPartition('persist:perchance'),
       preload: path.join(__dirname, 'perchancePreload.js'),
+      // The generator itself lives in a nested <iframe>, not the top-level
+      // frame — Electron only loads a preload script into the main frame
+      // by default, so window.promptloomBridge would otherwise never exist
+      // where the save-button listener actually needs it.
+      nodeIntegrationInSubFrames: true,
     },
   });
   view = newView;
@@ -48,6 +53,14 @@ export function getPerchanceWebContents(): WebContents {
     throw new Error('Perchance view has not been created yet');
   }
   return view.webContents;
+}
+
+// Right-click "Inspect Element" doesn't currently work for this view — this
+// gives a way to open its DevTools anyway, e.g. to see console output/
+// errors from the injected save-button script, or to run diagnostic JS by
+// hand against the real page.
+export function openPerchanceDevTools(): void {
+  getPerchanceWebContents().openDevTools({ mode: 'detach' });
 }
 
 // The renderer's status listener may subscribe after the view has already

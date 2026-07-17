@@ -8,3 +8,11 @@ contextBridge.exposeInMainWorld('promptloomBridge', {
   saveImage: (imageDataUrl: string, prompt: string, seed: string | null) =>
     ipcRenderer.send('perchance:saveImage', imageDataUrl, prompt, seed),
 });
+
+// Confirms in DevTools whether this preload is actually running in a given
+// frame at all — the generator lives in a subframe, and whether preload
+// scripts load there depends on nodeIntegrationInSubFrames actually taking
+// effect for it.
+console.log(
+  `[PromptLoom] perchancePreload loaded (mainFrame=${process.isMainFrame}, url=${location.href})`,
+);
