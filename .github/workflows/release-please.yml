@@ -13,17 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
       - name: Label the release PR
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRS_JSON: ${{ steps.release.outputs.prs }}
         run: |
           gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
-          prs=$(gh pr list --repo "${{ github.repository }}" --state open --json number,headRefName \
-            --jq '.[] | select(.headRefName | startswith("release-please--")) | .number')
-          for pr in $prs; do
+          for pr in $(echo "$PRS_JSON" | jq -r '.[].number'); do
             gh pr edit "$pr" --repo "${{ github.repository }}" --add-label RELEASE
           done
