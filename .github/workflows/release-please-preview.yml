@@ -1,0 +1,65 @@
+name: release-please-preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Run release-please dry run
+        run: |
+          npx --yes release-please release-pr \
+            --token="${{ secrets.GITHUB_TOKEN }}" \
+            --repo-url="${{ github.repository }}" \
+            --target-branch="${{ github.head_ref }}" \
+            --dry-run > dryrun-output.txt 2>&1 || true
+
+      - name: Remove previous preview comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          comment_ids=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '.[] | select(.body | contains("<!-- release-please-preview -->")) | .id')
+          for id in $comment_ids; do
+            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$id"
+          done
+
+      - name: Post preview comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # The full dry-run log is mostly internal debug/backfill noise —
+          # keep just the "would open this PR" summary through the
+          # generated changelog, dropping the file-update trace after it.
+          sed -n '/^Would open/,/^updates:/p' dryrun-output.txt | sed '$d' > trimmed-output.txt
+
+          {
+            echo "<!-- release-please-preview -->"
+            echo "### 🤖 release-please preview"
+            echo
+            echo "What merging this PR into \`master\` would trigger:"
+            echo
+            if [ -s trimmed-output.txt ]; then
+              echo '```'
+              cat trimmed-output.txt
+              echo '```'
+            else
+              echo "No releasable changes detected."
+            fi
+            echo
+            echo "[Full run]($run_url)"
+          } > comment-body.md
+          gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file comment-body.md
