@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # docker compose build has no cross-run cache on ephemeral GH-hosted
       # runners, so every run was re-doing the full apt-get install (~90s+
