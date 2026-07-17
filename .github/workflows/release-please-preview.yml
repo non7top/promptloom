@@ -41,6 +41,14 @@ jobs:
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
+          # "Would open 0 pull requests" still matches /^Would open/, so the
+          # trimmed file is never actually empty — check the real count
+          # instead of relying on that file having any bytes in it.
+          would_release=false
+          if grep -qE '^Would open [1-9]' dryrun-output.txt; then
+            would_release=true
+          fi
+
           # The full dry-run log is mostly internal debug/backfill noise —
           # keep just the "would open this PR" summary through the
           # generated changelog, dropping the file-update trace after it.
@@ -52,7 +60,7 @@ jobs:
             echo
             echo "What merging this PR into \`master\` would trigger:"
             echo
-            if [ -s trimmed-output.txt ]; then
+            if [ "$would_release" = true ]; then
               echo '```'
               cat trimmed-output.txt
               echo '```'
@@ -63,13 +71,14 @@ jobs:
             echo "[Full run]($run_url)"
           } > comment-body.md
           gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file comment-body.md
+          echo "$would_release" > would-release.txt
 
       - name: Label PR if it would trigger a release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
-          if [ -s trimmed-output.txt ]; then
+          if [ "$(cat would-release.txt)" = true ]; then
             gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --add-label RELEASE
           else
             gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --remove-label RELEASE || true
