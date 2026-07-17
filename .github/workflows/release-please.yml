@@ -12,19 +12,15 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # release-please-config.json's extra-label handles applying RELEASE
+      # to the generated PR natively — just make sure it exists in red
+      # before the action runs, since the action won't set its color.
+      - name: Ensure the RELEASE label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
+
       - uses: googleapis/release-please-action@v5
-        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-
-      - name: Label the release PR
-        if: ${{ steps.release.outputs.prs_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRS_JSON: ${{ steps.release.outputs.prs }}
-        run: |
-          gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
-          for pr in $(echo "$PRS_JSON" | jq -r '.[].number'); do
-            gh pr edit "$pr" --repo "${{ github.repository }}" --add-label RELEASE
-          done
