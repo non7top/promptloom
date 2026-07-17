@@ -142,9 +142,9 @@ export default function Composer({ categories, items }: Props) {
             Combination {comboIndex + 1} of {combos.length}
           </p>
           <p className="hint">
-            Prompt populated on the page — click Generate there yourself, then click the ⭐💾
-            button under any image you want to keep. Saved images land in the Gallery under
-            &quot;{stashName}&quot;.
+            Prompt populated on the page — click Generate there yourself, then click perchance&apos;s
+            own 🛡️💾 save button under any image you want to keep. Saved images land in the
+            Gallery under &quot;{stashName}&quot;.
           </p>
           <button onClick={next} disabled={comboIndex + 1 >= combos.length}>
             Populate next prompt

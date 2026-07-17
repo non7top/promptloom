@@ -15,9 +15,10 @@ See [project.md](project.md) for the original brief.
   "stash" (a named group for whatever you're about to generate), then hit
   Start. PromptLoom populates the perchance prompt field for the first
   combination — you review it and click Generate yourself.
-- Once images appear, a ⭐💾 button PromptLoom adds next to perchance's own
-  per-image save button lets you keep only the ones you actually like —
-  click "Populate next prompt" to move to the next combination.
+- Once images appear, click perchance's own per-image 🛡️💾 save button on
+  whichever ones you actually like — PromptLoom intercepts that call so it
+  saves to your Gallery too — then click "Populate next prompt" to move to
+  the next combination.
 - Saving reads the prompt and seed directly from the image itself (perchance
   embeds both), so what's stored is always exactly what was submitted, not
   just what PromptLoom composed. Everything lands in the Gallery grouped by

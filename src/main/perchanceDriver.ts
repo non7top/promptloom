@@ -6,7 +6,8 @@ import { getPerchanceWebContents } from './perchanceView';
 // - each result sits in a <div class="t2i-image-ctn"> containing an <img>
 //   whose `src` is already a data: URL and whose `title` embeds
 //   "seed=<n>" alongside the full prompt used, plus perchance's own
-//   "private save" button (class="private-save-button").
+//   "private save" button calling a global window.t2i_privateGallerySave(
+//   buttonEl, containerEl) function.
 //
 // The generator itself may run inside a nested <iframe> rather than the
 // top-level document (common for perchance.org, which wraps generators in
@@ -14,7 +15,6 @@ import { getPerchanceWebContents } from './perchanceView';
 // into that, even though the elements are visibly on screen. Search every
 // frame in the page for the one that actually contains these elements.
 const PROMPT_SELECTOR = 'textarea[data-name="description"]';
-const IMAGE_CONTAINER_SELECTOR = '.t2i-image-ctn';
 const FRAME_SEARCH_RETRIES = 10;
 const FRAME_SEARCH_RETRY_DELAY_MS = 500;
 
@@ -89,47 +89,42 @@ export async function populatePrompt(promptText: string): Promise<void> {
   }
 }
 
-// Adds a "Save to PromptLoom" button next to perchance's own per-image
-// "private save" button in every .t2i-image-ctn result container, and
-// keeps doing so for new containers as more images are generated. Clicking
-// it hands that specific image's src/title to the main process via the
-// bridge exposed by perchancePreload.ts — the main process, not this
-// script, decides what to do with it (see ipc.ts's 'perchance:saveImage'
-// handler), since this code runs in perchance's own untrusted page.
-const INJECT_SAVE_BUTTONS_SCRIPT = `
+// Rather than injecting a new button into the DOM — which the site's own
+// JS silently wipes out whenever it re-renders a result container, since
+// an injected sibling isn't part of that framework's own DOM — wrap the
+// *global function* perchance's existing "private save" button already
+// calls. A JS reference doesn't get discarded by DOM re-renders, so this
+// only needs to run once (well, once per page load) rather than
+// continually fighting to keep a DOM node alive. Clicking perchance's own
+// save button then also hands that image's src/title to the main process
+// via the bridge exposed by perchancePreload.ts (see ipc.ts's
+// 'perchance:saveImage' handler) — the main process, not this script,
+// decides what to do with it, since this code runs in perchance's own
+// untrusted page.
+const INTERCEPT_SAVE_FUNCTION_SCRIPT = `
 (() => {
-  if (window.__promptloomButtonsInjected) return;
-  window.__promptloomButtonsInjected = true;
-
-  function addButton(container) {
-    if (container.querySelector('.promptloom-save-button')) return;
-    const img = container.querySelector('img');
-    if (!img) return;
-    const btn = document.createElement('button');
-    btn.className = 'promptloom-save-button';
-    btn.style.marginLeft = '0.5rem';
-    btn.title = 'Save to PromptLoom';
-    btn.textContent = '⭐💾';
-    btn.onclick = () => window.promptloomBridge.saveImage(img.src, img.title);
-    const existing = container.querySelector('.private-save-button');
-    if (existing) {
-      existing.insertAdjacentElement('afterend', btn);
-    } else {
-      container.appendChild(btn);
+  function wrap() {
+    const original = window.t2i_privateGallerySave;
+    if (typeof original !== 'function' || original.__promptloomWrapped) {
+      return typeof original === 'function';
     }
+    const wrapped = function (buttonEl, containerEl) {
+      const result = original.apply(this, arguments);
+      const img = containerEl && containerEl.querySelector ? containerEl.querySelector('img') : null;
+      if (img) window.promptloomBridge.saveImage(img.src, img.title);
+      return result;
+    };
+    wrapped.__promptloomWrapped = true;
+    window.t2i_privateGallerySave = wrapped;
+    return true;
   }
 
-  document.querySelectorAll(${JSON.stringify(IMAGE_CONTAINER_SELECTOR)}).forEach(addButton);
-
-  new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (!(node instanceof HTMLElement)) continue;
-        if (node.matches(${JSON.stringify(IMAGE_CONTAINER_SELECTOR)})) addButton(node);
-        node.querySelectorAll?.(${JSON.stringify(IMAGE_CONTAINER_SELECTOR)}).forEach(addButton);
-      }
-    }
-  }).observe(document.body, { childList: true, subtree: true });
+  if (wrap()) return;
+  // The function may not be defined yet the first time this runs (page
+  // still initializing) — keep trying until it appears, then stop.
+  const interval = setInterval(() => {
+    if (wrap()) clearInterval(interval);
+  }, 500);
 })();
 `;
 
@@ -139,15 +134,16 @@ export async function injectSaveButtons(): Promise<void> {
     const frame = await findFrameWithSelector(PROMPT_SELECTOR);
     if (frame) {
       // eslint-disable-next-line no-await-in-loop
-      await frame.executeJavaScript(INJECT_SAVE_BUTTONS_SCRIPT);
+      await frame.executeJavaScript(INTERCEPT_SAVE_FUNCTION_SCRIPT);
       return;
     }
     // eslint-disable-next-line no-await-in-loop -- retries must happen sequentially
     await new Promise((resolve) => setTimeout(resolve, FRAME_SEARCH_RETRY_DELAY_MS));
   }
   // Not fatal — the page may still be on the Cloudflare check. The user
-  // will just not see a save button until they navigate past it and
-  // manually retry, so this is logged rather than thrown.
+  // will just not see saves land in PromptLoom until they navigate past
+  // it and the next frame-load retry succeeds, so this is logged rather
+  // than thrown.
   // eslint-disable-next-line no-console
-  console.warn('[perchanceDriver] Gave up looking for the generator frame to inject save buttons into');
+  console.warn('[perchanceDriver] Gave up looking for the generator frame to intercept the save function in');
 }
