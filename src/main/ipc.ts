@@ -42,6 +42,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('generations:deleteBatch', (_event, batchLabel: string) =>
     db.deleteBatch(batchLabel),
   );
+  ipcMain.handle('generations:renameBatch', (_event, oldLabel: string, newLabel: string) =>
+    db.renameBatch(oldLabel, newLabel),
+  );
 
   ipcMain.handle('generations:saveAs', async (_event, id: number) => {
     const generation = db.getGeneration(id);

@@ -48,6 +48,7 @@ export interface PromptLoomApi {
   ): Promise<Generation>;
   deleteGeneration(id: number): Promise<void>;
   deleteBatch(batchLabel: string): Promise<void>;
+  renameBatch(oldLabel: string, newLabel: string): Promise<void>;
   saveGenerationAs(id: number): Promise<string | null>;
 
   populatePrompt(promptText: string): Promise<void>;

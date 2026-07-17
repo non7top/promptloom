@@ -32,6 +32,8 @@ export default function Gallery() {
   const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
   const deleteTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [collapsedLabels, setCollapsedLabels] = useState<Set<string>>(new Set());
+  const [renamingLabel, setRenamingLabel] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -93,6 +95,20 @@ export default function Gallery() {
     reload();
   };
 
+  const startRename = (label: string) => {
+    setRenameValue(label);
+    setRenamingLabel(label);
+  };
+
+  const saveRename = async (oldLabel: string) => {
+    const newLabel = renameValue.trim();
+    if (newLabel && newLabel !== oldLabel) {
+      await window.promptloom.renameBatch(oldLabel, newLabel);
+      reload();
+    }
+    setRenamingLabel(null);
+  };
+
   const setStashOpen = (label: string, open: boolean) => {
     setCollapsedLabels((prev) => {
       const next = new Set(prev);
@@ -120,9 +136,34 @@ export default function Gallery() {
           onToggle={(e) => setStashOpen(label, e.currentTarget.open)}
         >
           <summary>
-            <strong>
-              {label} ({group.length})
-            </strong>
+            {renamingLabel === label ? (
+              <input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveRename(label);
+                  if (e.key === 'Escape') setRenamingLabel(null);
+                }}
+                onBlur={() => saveRename(label)}
+                autoFocus
+              />
+            ) : (
+              <strong>
+                {label} ({group.length})
+              </strong>
+            )}
+            <button
+              className="btn-rename btn-docked-corner btn-docked-corner-2nd"
+              title="Rename"
+              aria-label="Rename"
+              onClick={(e) => {
+                e.stopPropagation();
+                startRename(label);
+              }}
+            >
+              ✏️
+            </button>
             <button
               className="btn-danger-mild btn-docked-corner"
               title="Delete group"

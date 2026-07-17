@@ -214,3 +214,10 @@ export function deleteBatch(batchLabel: string): void {
     removeImageAndSidecar(row.image_path);
   }
 }
+
+export function renameBatch(oldLabel: string, newLabel: string): void {
+  db.prepare('UPDATE generations SET batch_label = ? WHERE batch_label = ?').run(
+    newLabel,
+    oldLabel,
+  );
+}

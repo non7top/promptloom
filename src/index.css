@@ -115,6 +115,10 @@ input:focus-visible {
   border-radius: 8px 0 0 6px;
 }
 
+.category:not([open]) .btn-docked-corner-2nd {
+  border-radius: 0;
+}
+
 /* Destructive actions are color-coded by how much they destroy: deleting
    one image is a mild, easily-undone-by-regenerating action; deleting an
    entire stash is not, so it reads as a much stronger red. */
@@ -127,6 +131,24 @@ input:focus-visible {
 .btn-danger-mild:hover {
   background: linear-gradient(to bottom, #f7b1a5, #ef9284);
   border-color: #d97a68;
+}
+
+/* Same shape/size/docking as the delete button (via .btn-docked-corner),
+   just blue and shifted over to stack immediately to its right. */
+.btn-rename {
+  background: linear-gradient(to bottom, #a9c8f5, #7fa8e8);
+  border-color: #5a86c9;
+  color: #0d2d5c;
+}
+
+.btn-rename:hover {
+  background: linear-gradient(to bottom, #96b8ee, #6b98de);
+  border-color: #4a76b9;
+}
+
+.btn-docked-corner-2nd {
+  left: calc(1.6rem - 1px);
+  border-radius: 0;
 }
 
 .btn-danger-strong {
@@ -253,9 +275,9 @@ input {
 .category > summary {
   margin-top: -0.3rem;
   margin-bottom: 0.4rem;
-  /* Room for the .btn-docked-corner tab docked at the top-left corner,
-     which is taken out of this row's normal flex flow. */
-  padding-left: 2.5rem;
+  /* Room for the two stacked .btn-docked-corner buttons (delete + rename)
+     at the top-left corner, taken out of this row's normal flex flow. */
+  padding-left: 4.1rem;
 }
 
 /* On its own row below the header rather than crammed inline next to the

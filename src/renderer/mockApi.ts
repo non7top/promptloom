@@ -118,6 +118,11 @@ export const mockApi: PromptLoomApi = {
       if (generations[i].batchLabel === batchLabel) generations.splice(i, 1);
     }
   },
+  renameBatch: async (oldLabel, newLabel) => {
+    for (const generation of generations) {
+      if (generation.batchLabel === oldLabel) generation.batchLabel = newLabel;
+    }
+  },
   saveGenerationAs: async () => null,
 
   populatePrompt: async () => undefined,

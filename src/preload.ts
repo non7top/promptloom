@@ -19,6 +19,8 @@ const api: PromptLoomApi = {
     ipcRenderer.invoke('generations:save', batchLabel, promptText, selection, seed, imageDataUrl),
   deleteGeneration: (id) => ipcRenderer.invoke('generations:delete', id),
   deleteBatch: (batchLabel) => ipcRenderer.invoke('generations:deleteBatch', batchLabel),
+  renameBatch: (oldLabel, newLabel) =>
+    ipcRenderer.invoke('generations:renameBatch', oldLabel, newLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
 
   populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
