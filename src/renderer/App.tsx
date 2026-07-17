@@ -10,7 +10,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('definitions');
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [perchanceStatus, setPerchanceStatus] = useState('Connecting...');
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const reload = async () => {
     const [nextCategories, nextItems] = await Promise.all([
@@ -28,17 +28,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    return window.promptloom.onPerchanceStatus((status) => {
-      setPerchanceStatus(
-        status.connected ? `Connected: ${status.url}` : `Failed to load (${status.error})`,
-      );
-    });
-  }, []);
+    // #sidebar is static markup in index.html, outside this component's own
+    // root, so its width toggle is applied directly rather than through JSX.
+    document.getElementById('sidebar')?.classList.toggle('sidebar-expanded', rightPanelCollapsed);
+    window.promptloom.setPerchanceHidden(rightPanelCollapsed);
+  }, [rightPanelCollapsed]);
 
   return (
     <div>
-      <h1>PromptLoom</h1>
-      <p className="hint">{perchanceStatus}</p>
       <nav className="tabs">
         <button
           className={tab === 'definitions' ? 'active' : ''}
@@ -51,6 +48,13 @@ export default function App() {
         </button>
         <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
           Gallery
+        </button>
+        <button
+          className="tab-collapse"
+          title={rightPanelCollapsed ? 'Show perchance panel' : 'Collapse right panel'}
+          onClick={() => setRightPanelCollapsed((v) => !v)}
+        >
+          {rightPanelCollapsed ? '⇤' : '⇥'}
         </button>
       </nav>
       {tab === 'definitions' && (

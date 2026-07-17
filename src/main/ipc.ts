@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as db from './db';
 import { populatePrompt } from './perchanceDriver';
-import { getLastPerchanceStatus } from './perchanceView';
+import { getLastPerchanceStatus, setPerchanceViewHidden } from './perchanceView';
 
 let currentStash = 'Unsorted';
 
@@ -42,13 +42,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('generations:deleteBatch', (_event, batchLabel: string) =>
     db.deleteBatch(batchLabel),
   );
+  ipcMain.handle('generations:renameBatch', (_event, oldLabel: string, newLabel: string) =>
+    db.renameBatch(oldLabel, newLabel),
+  );
 
   ipcMain.handle('generations:saveAs', async (_event, id: number) => {
-    const imagePath = db.getGenerationImagePath(id);
-    if (!imagePath) return null;
+    const generation = db.getGeneration(id);
+    if (!generation) return null;
 
     const saveOptions = {
-      defaultPath: path.basename(imagePath),
+      defaultPath: path.basename(generation.imagePath),
       filters: [{ name: 'PNG Image', extensions: ['png'] }],
     };
     const window = BrowserWindow.getFocusedWindow();
@@ -57,7 +60,9 @@ export function registerIpcHandlers(): void {
       : await dialog.showSaveDialog(saveOptions);
     if (canceled || !filePath) return null;
 
-    fs.copyFileSync(imagePath, filePath);
+    fs.copyFileSync(generation.imagePath, filePath);
+    const txtPath = filePath.replace(/\.png$/i, '') + '.txt';
+    fs.writeFileSync(txtPath, db.sidecarText(generation.promptText, generation.seed));
     return filePath;
   });
 
@@ -66,6 +71,10 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('perchance:getStatus', () => getLastPerchanceStatus());
+
+  ipcMain.handle('perchance:setHidden', (_event, hidden: boolean) =>
+    setPerchanceViewHidden(hidden),
+  );
 
   ipcMain.handle('stash:setCurrent', (_event, name: string) => {
     currentStash = name;

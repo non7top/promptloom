@@ -27,7 +27,9 @@ export default function DefinitionManager({ categories, items, onChange }: Props
           onChange={(e) => setNewCategoryName(e.target.value)}
           placeholder="New category (e.g. Pose)"
         />
-        <button type="submit">Add</button>
+        <button type="submit" className="btn-primary">
+          Add
+        </button>
       </form>
 
       {categories.map((category) => (
@@ -131,16 +133,20 @@ function CategorySection({
             {confirmingDelete ? (
               <>
                 <span className="hint">Delete category and all its items?</span>
-                <button onClick={confirmDeleteCategory}>Yes</button>
+                <button className="btn-danger-strong" onClick={confirmDeleteCategory}>
+                  Yes
+                </button>
                 <button onClick={() => setConfirmingDelete(false)}>No</button>
               </>
             ) : (
-              <button onClick={() => setConfirmingDelete(true)}>Delete</button>
+              <button className="btn-danger-mild" onClick={() => setConfirmingDelete(true)}>
+                Delete
+              </button>
             )}
           </>
         )}
       </header>
-      <ul>
+      <ul className="item-list">
         {items.map((item) =>
           editingItemId === item.id ? (
             <li key={item.id}>
@@ -160,11 +166,15 @@ function CategorySection({
               <button onClick={() => startEditItem(item)}>Edit</button>
               {deletingItemId === item.id ? (
                 <>
-                  <button onClick={() => confirmDeleteItem(item)}>Confirm delete</button>
+                  <button className="btn-danger-mild" onClick={() => confirmDeleteItem(item)}>
+                    Confirm delete
+                  </button>
                   <button onClick={() => setDeletingItemId(null)}>Cancel</button>
                 </>
               ) : (
-                <button onClick={() => setDeletingItemId(item.id)}>Delete</button>
+                <button className="btn-danger-mild" onClick={() => setDeletingItemId(item.id)}>
+                  Delete
+                </button>
               )}
             </li>
           ),
@@ -181,7 +191,9 @@ function CategorySection({
           onChange={(e) => setNewItemPrompt(e.target.value)}
           placeholder="Prompt fragment"
         />
-        <button type="submit">Add item</button>
+        <button type="submit" className="btn-primary">
+          Add item
+        </button>
       </form>
     </section>
   );
