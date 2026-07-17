@@ -93,21 +93,24 @@ export async function populatePrompt(promptText: string): Promise<void> {
 // JS silently wipes out whenever it re-renders a result container, since
 // an injected sibling isn't part of that framework's own DOM — wrap the
 // *global function* perchance's existing "private save" button already
-// calls. A JS reference doesn't get discarded by DOM re-renders, so this
-// only needs to run once (well, once per page load) rather than
-// continually fighting to keep a DOM node alive. Clicking perchance's own
-// save button then also hands that image's src/title to the main process
-// via the bridge exposed by perchancePreload.ts (see ipc.ts's
-// 'perchance:saveImage' handler) — the main process, not this script,
-// decides what to do with it, since this code runs in perchance's own
-// untrusted page.
+// calls. Clicking perchance's own save button then also hands that
+// image's src/title to the main process via the bridge exposed by
+// perchancePreload.ts (see ipc.ts's 'perchance:saveImage' handler) — the
+// main process, not this script, decides what to do with it, since this
+// code runs in perchance's own untrusted page.
+//
+// A JS reference doesn't get discarded by a DOM re-render the way an
+// injected element does, but the site's own per-render init code appears
+// to re-assign window.t2i_privateGallerySave fresh each time (plausible
+// for a per-instance-setup pattern) — a wrapped reference from an earlier
+// render otherwise gets silently clobbered back to the unwrapped original.
+// So this keeps re-checking indefinitely rather than wrapping once and
+// stopping, same fix as the DOM-button approach needed.
 const INTERCEPT_SAVE_FUNCTION_SCRIPT = `
 (() => {
   function wrap() {
     const original = window.t2i_privateGallerySave;
-    if (typeof original !== 'function' || original.__promptloomWrapped) {
-      return typeof original === 'function';
-    }
+    if (typeof original !== 'function' || original.__promptloomWrapped) return;
     const wrapped = function (buttonEl, containerEl) {
       const result = original.apply(this, arguments);
       const img = containerEl && containerEl.querySelector ? containerEl.querySelector('img') : null;
@@ -116,15 +119,11 @@ const INTERCEPT_SAVE_FUNCTION_SCRIPT = `
     };
     wrapped.__promptloomWrapped = true;
     window.t2i_privateGallerySave = wrapped;
-    return true;
   }
 
-  if (wrap()) return;
-  // The function may not be defined yet the first time this runs (page
-  // still initializing) — keep trying until it appears, then stop.
-  const interval = setInterval(() => {
-    if (wrap()) clearInterval(interval);
-  }, 500);
+  wrap();
+  if (window.__promptloomWrapInterval) return;
+  window.__promptloomWrapInterval = setInterval(wrap, 500);
 })();
 `;
 
