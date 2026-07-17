@@ -12,6 +12,26 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # release-please-config.json's extra-label handles applying RELEASE
+      # to the generated PR natively — just make sure it exists in red
+      # before the action runs, since the action won't set its color.
+      #
+      # extra-label (additive) is deliberate over label (release-please's
+      # own identifying label for its managed PR — replacing it risks
+      # breaking its ability to find/update that PR later) or release-label
+      # (applied post-merge/tag, not while the PR is still open).
+      #
+      # See release-please-preview.yml for why that workflow still shells
+      # out to the CLI's --dry-run instead of using this same action with
+      # skip-github-pull-request/skip-github-release: with those set, every
+      # output (prs_created, pr, version, ...) comes back completely empty,
+      # confirmed empirically and tracked upstream at
+      # https://github.com/googleapis/release-please-action/issues/1214
+      - name: Ensure the RELEASE label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
+
       - uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
