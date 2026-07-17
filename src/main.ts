@@ -1,10 +1,10 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers } from './main/ipc';
-import { createPerchanceView, setLastPerchanceStatus } from './main/perchanceView';
+import { createPerchanceView, openPerchanceDevTools, setLastPerchanceStatus } from './main/perchanceView';
 import { injectSaveButtons } from './main/perchanceDriver';
 import type { PerchanceStatus } from './shared/types';
 
@@ -49,6 +49,38 @@ const createWindow = () => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
+
+  // Right-click "Inspect Element" doesn't work inside the perchance
+  // WebContentsView, and Electron's default "Toggle Developer Tools" menu
+  // role only targets the focused BrowserWindow's own webContents (this
+  // app's UI), not a child WebContentsView — so replace the default menu
+  // with one that also exposes DevTools for the perchance panel directly.
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' },
+        ],
+      },
+      {
+        label: 'Debug',
+        submenu: [
+          {
+            label: 'Open Perchance DevTools',
+            click: () => openPerchanceDevTools(),
+          },
+        ],
+      },
+    ]),
+  );
 
   const perchanceView = createPerchanceView(mainWindow);
   const sendStatus = (status: PerchanceStatus) => {

@@ -50,6 +50,14 @@ export function getPerchanceWebContents(): WebContents {
   return view.webContents;
 }
 
+// Right-click "Inspect Element" doesn't currently work for this view — this
+// gives a way to open its DevTools anyway, e.g. to see console output/
+// errors from the injected save-button script, or to run diagnostic JS by
+// hand against the real page.
+export function openPerchanceDevTools(): void {
+  getPerchanceWebContents().openDevTools({ mode: 'detach' });
+}
+
 // The renderer's status listener may subscribe after the view has already
 // fired its first load event — cache the latest status so a fresh
 // subscriber can query it instead of missing that event.
