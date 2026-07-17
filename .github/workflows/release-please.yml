@@ -16,3 +16,14 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Label the release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
+          prs=$(gh pr list --repo "${{ github.repository }}" --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("release-please--")) | .number')
+          for pr in $prs; do
+            gh pr edit "$pr" --repo "${{ github.repository }}" --add-label RELEASE
+          done
