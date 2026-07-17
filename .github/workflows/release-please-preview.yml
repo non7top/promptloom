@@ -39,14 +39,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # The full dry-run log is mostly internal debug/backfill noise —
+          # keep just the "would open this PR" summary through the
+          # generated changelog, dropping the file-update trace after it.
+          sed -n '/^Would open/,/^updates:/p' dryrun-output.txt | sed '$d' > trimmed-output.txt
+
           {
             echo "<!-- release-please-preview -->"
             echo "### 🤖 release-please preview"
             echo
             echo "What merging this PR into \`master\` would trigger:"
             echo
-            echo '```'
-            cat dryrun-output.txt
-            echo '```'
+            if [ -s trimmed-output.txt ]; then
+              echo '```'
+              cat trimmed-output.txt
+              echo '```'
+            else
+              echo "No releasable changes detected."
+            fi
+            echo
+            echo "[Full run]($run_url)"
           } > comment-body.md
           gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file comment-body.md
