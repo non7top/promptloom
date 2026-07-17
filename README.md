@@ -1,9 +1,11 @@
 # PromptLoom
 
-Batch-compose and generate images on [perchance.org's AI text-to-image
-generator](https://perchance.org/ai-text-to-image-generator) from reusable
-pose / clothes / character / smile definitions, capturing each result's image
-and seed for reproducibility.
+A companion app for keeping track of prompt/seed combinations while working
+on sprites for visual novels, using [perchance.org's AI text-to-image
+generator](https://perchance.org/ai-text-to-image-generator). It composes
+prompts from reusable pose / clothes / character / smile definitions and
+captures each result's image and seed for reproducibility — it is not
+intended to bypass any restrictions of the platform or otherwise abuse it.
 
 See [project.md](project.md) for the original brief.
 

@@ -2,7 +2,7 @@
   "name": "promptloom",
   "productName": "PromptLoom",
   "version": "0.1.3",
-  "description": "Batch-compose and generate images on perchance.org's AI text-to-image generator from reusable pose/clothes/character/smile definitions, capturing seeds for reproducibility.",
+  "description": "A companion app for keeping track of prompt/seed combinations while working on sprites for visual novels, using perchance.org's AI text-to-image generator. Not intended to bypass any restrictions of the platform or otherwise abuse it.",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
