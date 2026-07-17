@@ -63,3 +63,14 @@ jobs:
             echo "[Full run]($run_url)"
           } > comment-body.md
           gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file comment-body.md
+
+      - name: Label PR if it would trigger a release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
+          if [ -s trimmed-output.txt ]; then
+            gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --add-label RELEASE
+          else
+            gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --remove-label RELEASE || true
+          fi
