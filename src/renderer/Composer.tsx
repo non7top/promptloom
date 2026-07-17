@@ -51,20 +51,33 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  const promptTextFor = (combo: Record<number, number>): string => {
+  // The actual prompt sent to perchance — plain comma-joined fragments.
+  // Text-to-image models don't parse any kind of comment syntax; anything
+  // added here becomes literal conditioning text the model sees, so this
+  // stays free of section labels/seed noise.
+  const plainPromptFor = (combo: Record<number, number>): string =>
+    categoriesWithItems
+      .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
+      .filter((fragment): fragment is string => Boolean(fragment))
+      .join(', ');
+
+  // Reference-only breakdown (which category contributed what, plus the
+  // seed) — shown on screen so a combination can be reconstructed later,
+  // never sent to perchance itself.
+  const referenceTextFor = (combo: Record<number, number>): string => {
     const sections = categoriesWithItems
       .map((category) => {
         const fragment = items.find((item) => item.id === combo[category.id])?.promptFragment;
-        return fragment ? `// ${category.name}\n${fragment}` : null;
+        return fragment ? `${category.name}: ${fragment}` : null;
       })
       .filter((section): section is string => Boolean(section));
-    const body = sections.join('\n\n');
-    return seed.trim() ? `${body}\n\nSeed: ${seed.trim()}` : body;
+    const body = sections.join('\n');
+    return seed.trim() ? `${body}\nSeed: ${seed.trim()}` : body;
   };
 
   const populate = async (combo: Record<number, number>) => {
     try {
-      await window.promptloom.populatePrompt(promptTextFor(combo));
+      await window.promptloom.populatePrompt(plainPromptFor(combo));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
