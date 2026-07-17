@@ -1,3 +1,9 @@
+:root {
+  /* Must match SIDEBAR_WIDTH in src/main/perchanceView.ts, which positions
+     the native perchance view to start exactly where this ends. */
+  --sidebar-width: 380px;
+}
+
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
@@ -13,9 +19,7 @@ body {
 }
 
 #sidebar {
-  /* Must match SIDEBAR_WIDTH in src/main/perchanceView.ts, which positions
-     the native perchance view to start exactly where this ends. */
-  width: 380px;
+  width: var(--sidebar-width);
   flex: none;
   padding: 0.3rem 0.75rem 0.75rem;
   box-sizing: border-box;
@@ -25,9 +29,6 @@ body {
      available width and reflow everything. */
   overflow-y: scroll;
   font-size: 0.9rem;
-  /* Containing block for the image lightbox, so it's confined to the
-     sidebar's own width rather than the whole window — the perchance
-     WebContentsView sits on top of anything past this edge anyway. */
   position: relative;
 }
 
@@ -371,8 +372,15 @@ input {
 }
 
 .lightbox-backdrop {
-  position: absolute;
-  inset: 0;
+  /* Fixed to the viewport (not #sidebar's scroll position) so it stays
+     visible regardless of scroll offset, but width-capped to the sidebar's
+     own width — the perchance WebContentsView sits on top of anything past
+     that edge anyway. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
@@ -381,6 +389,10 @@ input {
   box-sizing: border-box;
   z-index: 1000;
   cursor: zoom-out;
+}
+
+#sidebar.sidebar-expanded .lightbox-backdrop {
+  width: 100%;
 }
 
 .lightbox-backdrop img {
@@ -416,16 +428,28 @@ input {
   border: 1px solid #999;
   cursor: zoom-in;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
-  /* Checkerboard so transparent-background generations stay visible
-     regardless of the surrounding panel color. */
-  background:
-    repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+  object-fit: contain;
+  /* Generations are typically on a white background, so letterbox with
+     white rather than a transparency checkerboard. */
+  background: #fff;
   transition: filter 0.1s ease;
 }
 
 .gallery img:hover {
   filter: brightness(0.92);
+}
+
+@keyframes gallery-just-saved-pulse {
+  from {
+    box-shadow: 0 0 0 3px rgba(107, 159, 255, 0.9);
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(107, 159, 255, 0);
+  }
+}
+
+.gallery-just-saved {
+  animation: gallery-just-saved-pulse 2s ease-out;
 }
 
 .gallery details {

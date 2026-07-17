@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PerchanceStatus, PromptLoomApi } from './shared/types';
+import type { Generation, PerchanceStatus, PromptLoomApi } from './shared/types';
 
 const api: PromptLoomApi = {
   listCategories: () => ipcRenderer.invoke('categories:list'),
@@ -36,6 +36,12 @@ const api: PromptLoomApi = {
       callback(status);
     ipcRenderer.on('perchance:status', listener);
     return () => ipcRenderer.removeListener('perchance:status', listener);
+  },
+  onGenerationSaved: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, generation: Generation) =>
+      callback(generation);
+    ipcRenderer.on('generations:saved', listener);
+    return () => ipcRenderer.removeListener('generations:saved', listener);
   },
 };
 

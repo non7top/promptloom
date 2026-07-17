@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Generation } from '../shared/types';
 
 const DELETE_UNDO_WINDOW_MS = 10_000;
+const JUST_SAVED_HIGHLIGHT_MS = 2_000;
 
 // Deterministic per-stash color (same label always gets the same shade, no
 // two labels drift on every reload) so stashes are easier to tell apart at a
@@ -34,6 +35,8 @@ export default function Gallery() {
   const [collapsedLabels, setCollapsedLabels] = useState<Set<string>>(new Set());
   const [renamingLabel, setRenamingLabel] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [justSavedId, setJustSavedId] = useState<number | null>(null);
+  const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -43,6 +46,21 @@ export default function Gallery() {
     // Initial IPC data load on mount, not a subscription to an external system.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
+  }, []);
+
+  useEffect(() => {
+    // Perchance's own save button writes straight to the DB from the main
+    // process, bypassing any renderer action of ours — this is the only
+    // signal we get that a new image landed, so re-fetch and briefly
+    // highlight it.
+    return window.promptloom.onGenerationSaved((generation) => {
+      reload();
+      setJustSavedId(generation.id);
+      if (justSavedTimer.current) clearTimeout(justSavedTimer.current);
+      justSavedTimer.current = setTimeout(() => {
+        setJustSavedId(null);
+      }, JUST_SAVED_HIGHLIGHT_MS);
+    });
   }, []);
 
   useEffect(() => {
@@ -194,7 +212,7 @@ export default function Gallery() {
           <ul className="gallery">
             {group.map((generation) => {
               const fullText = generation.seed
-                ? `${generation.promptText} - seed ${generation.seed}`
+                ? `${generation.promptText} (seed:::${generation.seed})`
                 : generation.promptText;
               if (pendingDeleteIds.has(generation.id)) {
                 return (
@@ -205,7 +223,10 @@ export default function Gallery() {
                 );
               }
               return (
-                <li key={generation.id}>
+                <li
+                  key={generation.id}
+                  className={generation.id === justSavedId ? 'gallery-just-saved' : undefined}
+                >
                   <img
                     src={generation.imageUrl}
                     alt={generation.promptText}
@@ -237,7 +258,10 @@ export default function Gallery() {
                       disabled={!generation.seed}
                       title="Copy seed"
                       aria-label="Copy seed"
-                      onClick={() => generation.seed && navigator.clipboard.writeText(generation.seed)}
+                      onClick={() =>
+                        generation.seed &&
+                        navigator.clipboard.writeText(`(seed:::${generation.seed})`)
+                      }
                     >
                       🌱
                     </button>
