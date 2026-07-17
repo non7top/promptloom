@@ -52,5 +52,6 @@ export interface PromptLoomApi {
 
   populatePrompt(promptText: string): Promise<void>;
   setCurrentStash(name: string): Promise<void>;
+  setPerchanceHidden(hidden: boolean): Promise<void>;
   onPerchanceStatus(callback: (status: PerchanceStatus) => void): () => void;
 }

@@ -7,6 +7,18 @@ export const SIDEBAR_WIDTH = 380;
 
 let view: WebContentsView | undefined;
 let lastStatus: PerchanceStatus = { connected: false };
+let mainWindowRef: BrowserWindow | undefined;
+let hidden = false;
+
+function computeBounds(mainWindow: BrowserWindow) {
+  const [width, height] = mainWindow.getContentSize();
+  return {
+    x: SIDEBAR_WIDTH,
+    y: 0,
+    width: Math.max(width - SIDEBAR_WIDTH, 0),
+    height,
+  };
+}
 
 export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView {
   const newView = new WebContentsView({
@@ -21,6 +33,7 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
     },
   });
   view = newView;
+  mainWindowRef = mainWindow;
   mainWindow.contentView.addChildView(newView);
   newView.webContents.loadURL(PERCHANCE_URL);
 
@@ -34,18 +47,29 @@ export function createPerchanceView(mainWindow: BrowserWindow): WebContentsView 
   });
 
   const updateBounds = () => {
-    const [width, height] = mainWindow.getContentSize();
-    newView.setBounds({
-      x: SIDEBAR_WIDTH,
-      y: 0,
-      width: Math.max(width - SIDEBAR_WIDTH, 0),
-      height,
-    });
+    // Skip while hidden — otherwise a resize while a lightbox is open would
+    // reassert the view's real bounds and pop it back on top.
+    if (hidden) return;
+    newView.setBounds(computeBounds(mainWindow));
   };
   updateBounds();
   mainWindow.on('resize', updateBounds);
 
   return newView;
+}
+
+// The perchance view is a separate native compositor layer, always drawn on
+// top of the sidebar's own web contents regardless of DOM z-index — so a
+// sidebar overlay (e.g. the image lightbox) that's meant to cover the whole
+// window has to hide this out of the way first, then restore it after.
+export function setPerchanceViewHidden(nextHidden: boolean): void {
+  if (!view || !mainWindowRef) return;
+  hidden = nextHidden;
+  if (hidden) {
+    view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+  } else {
+    view.setBounds(computeBounds(mainWindowRef));
+  }
 }
 
 export function getPerchanceWebContents(): WebContents {

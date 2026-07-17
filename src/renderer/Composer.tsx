@@ -21,6 +21,7 @@ function cartesianProduct(
 export default function Composer({ categories, items }: Props) {
   const [selected, setSelected] = useState<Record<number, Set<number>>>({});
   const [stashName, setStashName] = useState('');
+  const [seed, setSeed] = useState('');
   const [combos, setCombos] = useState<Record<number, number>[] | null>(null);
   const [comboIndex, setComboIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -50,11 +51,16 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  const promptTextFor = (combo: Record<number, number>): string =>
-    categoriesWithItems
-      .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
-      .filter((fragment): fragment is string => Boolean(fragment))
-      .join(', ');
+  const promptTextFor = (combo: Record<number, number>): string => {
+    const sections = categoriesWithItems
+      .map((category) => {
+        const fragment = items.find((item) => item.id === combo[category.id])?.promptFragment;
+        return fragment ? `// ${category.name}\n${fragment}` : null;
+      })
+      .filter((section): section is string => Boolean(section));
+    const body = sections.join('\n\n');
+    return seed.trim() ? `${body}\n\nSeed: ${seed.trim()}` : body;
+  };
 
   const populate = async (combo: Record<number, number>) => {
     try {
@@ -90,6 +96,13 @@ export default function Composer({ categories, items }: Props) {
 
   return (
     <div>
+      <input
+        value={seed}
+        onChange={(e) => setSeed(e.target.value)}
+        placeholder="Seed (optional, appended to the prompt)"
+        disabled={combos !== null}
+      />
+
       {categoriesWithItems.length === 0 && (
         <p className="hint">Add some categories and items in Definitions first.</p>
       )}
@@ -98,7 +111,7 @@ export default function Composer({ categories, items }: Props) {
           <header>
             <strong>{category.name}</strong>
           </header>
-          <ul>
+          <ul className="item-list">
             {items
               .filter((item) => item.categoryId === category.id)
               .map((item) => (
@@ -132,7 +145,7 @@ export default function Composer({ categories, items }: Props) {
               ? `${combinationCount} combination${combinationCount === 1 ? '' : 's'} ready`
               : 'Select at least one item in every category to start.'}
           </p>
-          <button onClick={start} disabled={!readyToRun}>
+          <button className="btn-primary" onClick={start} disabled={!readyToRun}>
             Start
           </button>
         </>

@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -116,6 +117,13 @@ export function listGenerations(): Generation[] {
   }));
 }
 
+// A companion .txt file next to each image, so the prompt and seed stay
+// readable/portable straight from the stash folder on disk, not just the
+// app's own database.
+export function sidecarText(promptText: string, seed: string | null): string {
+  return `Prompt: ${promptText}\nSeed: ${seed ?? 'unknown'}\n`;
+}
+
 export function saveGeneration(
   batchLabel: string,
   promptText: string,
@@ -131,9 +139,14 @@ export function saveGeneration(
     .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
   const id = Number(lastInsertRowid);
 
-  const imagePath = path.join(imagesDir, `${id}.png`);
+  // Random names, not sequential IDs — a stash folder can end up with
+  // millions of these, and there's no reason to expose (or rely on) the
+  // DB's row order in the filename.
+  const baseName = randomUUID();
+  const imagePath = path.join(imagesDir, `${baseName}.png`);
   const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
   fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'));
+  fs.writeFileSync(path.join(imagesDir, `${baseName}.txt`), sidecarText(promptText, seed));
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
 
   return {
@@ -148,11 +161,38 @@ export function saveGeneration(
   };
 }
 
-export function getGenerationImagePath(id: number): string | null {
-  const row = db.prepare('SELECT image_path FROM generations WHERE id = ?').get(id) as
-    | { image_path: string }
+export function getGeneration(id: number): Generation | null {
+  const row = db
+    .prepare(
+      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at FROM generations WHERE id = ?',
+    )
+    .get(id) as
+    | {
+        id: number;
+        batch_label: string;
+        prompt_text: string;
+        selection_json: string;
+        seed: string | null;
+        image_path: string;
+        created_at: string;
+      }
     | undefined;
-  return row?.image_path ?? null;
+  if (!row) return null;
+  return {
+    id: row.id,
+    batchLabel: row.batch_label,
+    promptText: row.prompt_text,
+    selection: JSON.parse(row.selection_json),
+    seed: row.seed,
+    imagePath: row.image_path,
+    imageUrl: pathToFileURL(row.image_path).href,
+    createdAt: row.created_at,
+  };
+}
+
+function removeImageAndSidecar(imagePath: string): void {
+  fs.rmSync(imagePath, { force: true });
+  fs.rmSync(imagePath.replace(/\.png$/i, '') + '.txt', { force: true });
 }
 
 export function deleteGeneration(id: number): void {
@@ -161,7 +201,7 @@ export function deleteGeneration(id: number): void {
     | undefined;
   db.prepare('DELETE FROM generations WHERE id = ?').run(id);
   if (row?.image_path) {
-    fs.rmSync(row.image_path, { force: true });
+    removeImageAndSidecar(row.image_path);
   }
 }
 
@@ -171,6 +211,6 @@ export function deleteBatch(batchLabel: string): void {
     .all(batchLabel) as { image_path: string }[];
   db.prepare('DELETE FROM generations WHERE batch_label = ?').run(batchLabel);
   for (const row of rows) {
-    fs.rmSync(row.image_path, { force: true });
+    removeImageAndSidecar(row.image_path);
   }
 }
