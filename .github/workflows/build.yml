@@ -66,6 +66,7 @@ jobs:
         run: npm run make
 
       - name: Upload installer (Setup.exe)
+        id: upload-installer
         uses: actions/upload-artifact@v7
         with:
           name: promptloom-installer-${{ steps.vars.outputs.sha_short }}
@@ -77,13 +78,18 @@ jobs:
           compression-level: 0
 
       - name: Upload update package (.nupkg)
+        id: upload-nupkg
         uses: actions/upload-artifact@v7
         with:
           name: promptloom-nupkg-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/*.nupkg
           retention-days: 14
+          # .nupkg is itself a zip-based package format, so same reasoning
+          # as Setup.exe above — nothing left to gain from compressing it.
+          compression-level: 0
 
       - name: Upload RELEASES manifest
+        id: upload-releases
         uses: actions/upload-artifact@v7
         with:
           name: promptloom-releases-${{ steps.vars.outputs.sha_short }}
@@ -96,5 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`: download the \`promptloom-installer-*\`, \`promptloom-nupkg-*\`, and \`promptloom-releases-*\` artifacts from $RUN_URL (scroll to Artifacts at the bottom)."
+          gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`:
+          - [promptloom-installer-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-installer.outputs.artifact-url }})
+          - [promptloom-nupkg-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-nupkg.outputs.artifact-url }})
+          - [promptloom-releases-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-releases.outputs.artifact-url }})"
