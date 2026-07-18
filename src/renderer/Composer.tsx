@@ -51,17 +51,18 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  // Each chunk gets a `// Category` comment line ahead of its fragment,
-  // right in the prompt that's actually populated into perchance. That
-  // prompt is also what gets read back and stored verbatim (sidecar .txt,
-  // Gallery tooltip) once an image is saved, so the comments are what make
-  // it possible to tell which category contributed what chunk later,
-  // without a separate on-screen breakdown.
+  // Each chunk gets a `// Category:Item` comment line ahead of its
+  // fragment, right in the prompt that's actually populated into perchance.
+  // That prompt is also what gets read back and stored verbatim (sidecar
+  // .txt, Gallery tooltip) once an image is saved, so naming the exact item
+  // (not just its category) is what makes a saved prompt re-importable —
+  // reconstructing the selection later doesn't depend on matching fragment
+  // text back to an item.
   const plainPromptFor = (combo: Record<number, number>): string =>
     categoriesWithItems
       .map((category) => {
         const item = items.find((candidate) => candidate.id === combo[category.id]);
-        return item?.promptFragment ? `// ${category.name}\n${item.promptFragment}` : null;
+        return item?.promptFragment ? `// ${category.name}:${item.name}\n${item.promptFragment}` : null;
       })
       .filter((section): section is string => Boolean(section))
       .join('\n\n');
