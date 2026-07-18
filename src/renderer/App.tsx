@@ -60,7 +60,12 @@ export default function App() {
       {tab === 'definitions' && (
         <DefinitionManager categories={categories} items={items} onChange={reload} />
       )}
-      {tab === 'composer' && <Composer categories={categories} items={items} />}
+      {/* Kept mounted (rather than conditionally rendered like the other
+          tabs) so switching away and back doesn't lose the in-progress
+          checkbox selection, seed, or running combo. */}
+      <div style={{ display: tab === 'composer' ? 'block' : 'none' }}>
+        <Composer categories={categories} items={items} />
+      </div>
       {tab === 'gallery' && <Gallery />}
     </div>
   );
