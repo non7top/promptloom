@@ -69,32 +69,34 @@ jobs:
         id: upload-installer
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-installer-${{ steps.vars.outputs.sha_short }}
+          # `name` is ignored by the action whenever archive: false — the
+          # artifact takes the name of the file it's given instead, and
+          # `path` only matches the one Setup.exe squirrel produces.
           path: out/make/squirrel.windows/**/*.exe
           retention-days: 14
-          # Setup.exe is already a compressed archive internally — re-
-          # compressing it into the artifact zip just burns CPU for no
-          # real size benefit.
-          compression-level: 0
+          # Skip the action's own zip wrapper entirely rather than just
+          # turning off its compression — Setup.exe is already a compressed
+          # archive internally, so both were pure overhead.
+          archive: false
 
       - name: Upload update package (.nupkg)
         id: upload-nupkg
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-nupkg-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/*.nupkg
           retention-days: 14
-          # .nupkg is itself a zip-based package format, so same reasoning
-          # as Setup.exe above — nothing left to gain from compressing it.
-          compression-level: 0
+          # Same reasoning as Setup.exe above — .nupkg is itself a
+          # zip-based package format, so there's nothing to gain from
+          # wrapping it in another zip.
+          archive: false
 
       - name: Upload RELEASES manifest
         id: upload-releases
         uses: actions/upload-artifact@v7
         with:
-          name: promptloom-releases-${{ steps.vars.outputs.sha_short }}
           path: out/make/squirrel.windows/**/RELEASES
           retention-days: 14
+          archive: false
 
       - name: Comment download links on PR
         if: github.event_name == 'pull_request'
