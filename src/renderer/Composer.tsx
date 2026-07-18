@@ -51,29 +51,20 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  // The actual prompt sent to perchance — plain comma-joined fragments.
-  // Text-to-image models don't parse any kind of comment syntax; anything
-  // added here becomes literal conditioning text the model sees, so this
-  // stays free of section labels/seed noise.
+  // Each chunk gets a `// Category` comment line ahead of its fragment,
+  // right in the prompt that's actually populated into perchance. That
+  // prompt is also what gets read back and stored verbatim (sidecar .txt,
+  // Gallery tooltip) once an image is saved, so the comments are what make
+  // it possible to tell which category contributed what chunk later,
+  // without a separate on-screen breakdown.
   const plainPromptFor = (combo: Record<number, number>): string =>
     categoriesWithItems
-      .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
-      .filter((fragment): fragment is string => Boolean(fragment))
-      .join(', ');
-
-  // Reference-only breakdown (which category contributed what, plus the
-  // seed) — shown on screen so a combination can be reconstructed later,
-  // never sent to perchance itself.
-  const referenceTextFor = (combo: Record<number, number>): string => {
-    const sections = categoriesWithItems
       .map((category) => {
-        const fragment = items.find((item) => item.id === combo[category.id])?.promptFragment;
-        return fragment ? `${category.name}: ${fragment}` : null;
+        const item = items.find((candidate) => candidate.id === combo[category.id]);
+        return item?.promptFragment ? `// ${category.name}\n${item.promptFragment}` : null;
       })
-      .filter((section): section is string => Boolean(section));
-    const body = sections.join('\n');
-    return seed.trim() ? `${body}\nSeed: ${seed.trim()}` : body;
-  };
+      .filter((section): section is string => Boolean(section))
+      .join('\n\n');
 
   const populate = async (combo: Record<number, number>) => {
     try {
