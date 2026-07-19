@@ -93,6 +93,8 @@ export const mockApi: PromptLoomApi = {
     const index = items.findIndex((i) => i.id === id);
     if (index >= 0) items.splice(index, 1);
   },
+  exportDefinitions: async () => null,
+  importDefinitions: async () => null,
 
   listGenerations: async () => generations,
   saveGeneration: async (batchLabel, promptText, selection, seed) => {

@@ -26,6 +26,35 @@ export function registerIpcHandlers(): void {
   );
   ipcMain.handle('items:delete', (_event, id: number) => db.deleteItem(id));
 
+  ipcMain.handle('definitions:export', async () => {
+    const saveOptions = {
+      defaultPath: 'promptloom-definitions.txt',
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+    };
+    const window = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = window
+      ? await dialog.showSaveDialog(window, saveOptions)
+      : await dialog.showSaveDialog(saveOptions);
+    if (canceled || !filePath) return null;
+
+    fs.writeFileSync(filePath, db.exportDefinitionsText());
+    return filePath;
+  });
+
+  ipcMain.handle('definitions:import', async () => {
+    const openOptions: Electron.OpenDialogOptions = {
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+      properties: ['openFile'],
+    };
+    const window = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = window
+      ? await dialog.showOpenDialog(window, openOptions)
+      : await dialog.showOpenDialog(openOptions);
+    if (canceled || filePaths.length === 0) return null;
+
+    return db.importDefinitionsText(fs.readFileSync(filePaths[0], 'utf-8'));
+  });
+
   ipcMain.handle('generations:list', () => db.listGenerations());
   ipcMain.handle(
     'generations:save',
