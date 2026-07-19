@@ -1,17 +1,53 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  workflow_run:
+    workflows: ["release-please"]
+    types: [completed]
 
 jobs:
+  # release-please-action creates its tag/release using the default
+  # GITHUB_TOKEN, and GitHub doesn't trigger downstream workflows for refs
+  # created that way (an anti-recursion guard) — so this can't just trigger
+  # on push: tags like a normal release workflow would; a completed
+  # workflow_run fires regardless of what token the upstream run used.
+  # release-please itself runs on every push to master, not just ones that
+  # cut a release, so check whether this particular run actually did by
+  # looking for a semver tag on its exact commit before building anything.
+  check-release-tag:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.find_tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # workflow_run doesn't check out the commit that triggered it by
+          # default — it checks out the default branch's current tip, which
+          # may have moved on since. Pin to the exact commit release-please
+          # just processed, and fetch tags explicitly since fetch-depth: 0
+          # alone doesn't guarantee it.
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Find a release tag pointing at this commit
+        id: find_tag
+        shell: bash
+        run: |
+          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: check-release-tag
+    if: needs.check-release-tag.outputs.tag != ''
     runs-on: windows-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: actions/setup-node@v7
         with:
