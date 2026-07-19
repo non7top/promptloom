@@ -51,6 +51,14 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
+  // The seed field may already hold perchance's own `(seed:::N)` syntax —
+  // e.g. pasted from Gallery's "Copy seed" button — rather than a bare
+  // number, so don't blindly re-wrap an already-formatted value.
+  const formattedSeed = (raw: string): string => {
+    const trimmed = raw.trim();
+    return /^\(seed:::.*\)$/.test(trimmed) ? trimmed : `(seed:::${trimmed})`;
+  };
+
   // Each chunk gets a `// Category:Item` comment line ahead of its
   // fragment, right in the prompt that's actually populated into perchance.
   // That prompt is also what gets read back and stored verbatim (sidecar
@@ -58,14 +66,16 @@ export default function Composer({ categories, items }: Props) {
   // (not just its category) is what makes a saved prompt re-importable —
   // reconstructing the selection later doesn't depend on matching fragment
   // text back to an item.
-  const plainPromptFor = (combo: Record<number, number>): string =>
-    categoriesWithItems
+  const plainPromptFor = (combo: Record<number, number>): string => {
+    const sections = categoriesWithItems
       .map((category) => {
         const item = items.find((candidate) => candidate.id === combo[category.id]);
         return item?.promptFragment ? `// ${category.name}:${item.name}\n${item.promptFragment}` : null;
       })
-      .filter((section): section is string => Boolean(section))
-      .join('\n\n');
+      .filter((section): section is string => Boolean(section));
+    const body = sections.join('\n\n');
+    return seed.trim() ? `${body}\n\n${formattedSeed(seed)}` : body;
+  };
 
   const populate = async (combo: Record<number, number>) => {
     try {
