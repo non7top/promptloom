@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/non7top/promptloom/compare/v1.2.1...v1.3.0) (2026-07-19)
+
+
+### Features
+
+* **perchance:** mark already-saved images on the page itself ([938956c](https://github.com/non7top/promptloom/commit/938956cd42b5d85a7be1008d7f003cfd13f0bf2e))
+
 ## [1.2.1](https://github.com/non7top/promptloom/compare/v1.2.0...v1.2.1) (2026-07-19)
 
 
