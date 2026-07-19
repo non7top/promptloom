@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/non7top/promptloom/compare/v1.3.0...v1.4.0) (2026-07-19)
+
+
+### Features
+
+* **stash:** let the active stash be set manually ([27558da](https://github.com/non7top/promptloom/commit/27558da9ab8b7a70d99bd87e200c822042d1e8cf))
+* **stash:** let the active stash be set manually ([d480854](https://github.com/non7top/promptloom/commit/d4808545ac76a99318c8f03ee23c0a71014cc95a))
+
 ## [1.3.0](https://github.com/non7top/promptloom/compare/v1.2.1...v1.3.0) (2026-07-19)
 
 
