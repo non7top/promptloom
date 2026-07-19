@@ -48,6 +48,11 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history and tags: predict-next-version needs to walk back
+          # to the last release tag and build its own merge commit on top
+          # of this clone.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -62,17 +67,65 @@ jobs:
         shell: bash
         run: echo "sha_short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
+      # post-comment: false — this action's own PR comment/RELEASE-label
+      # side effects are release-please-preview.yml's job; here we only
+      # want the predicted version, to name this PR's build artifacts.
+      - name: Predict next version
+        id: predict
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/predict-next-version
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          post-comment: 'false'
+
+      # The action above leaves the working tree on its own synthetic
+      # preview-merge branch (or, if simulating the merge failed, on
+      # unmerged master) to compute the prediction — restore the PR's own
+      # head commit (which that action already fetched into this local
+      # branch) so the actual build below builds the PR's real changes,
+      # not whatever the action happened to leave checked out.
+      - name: Restore the PR's own head commit for the build
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git checkout preview-head
+
       - name: Package Windows installer
         run: npm run make
+
+      # Only meaningful for PR builds with a predicted release — plain
+      # pushes to master (already merged, not previewing anything) and
+      # no-releasable-change PRs keep the plain glob path below instead.
+      - name: Rename build artifacts to the predicted version
+        id: artifact_names
+        if: github.event_name == 'pull_request' && steps.predict.outputs.version != ''
+        shell: bash
+        run: |
+          VERSION_TAG="${{ steps.predict.outputs.version }}-rc${{ github.event.pull_request.number }}"
+          EXE_PATH=$(find out/make/squirrel.windows -name '*.exe' | head -1)
+          NUPKG_PATH=$(find out/make/squirrel.windows -name '*.nupkg' | head -1)
+          RELEASES_PATH=$(find out/make/squirrel.windows -name 'RELEASES' | head -1)
+
+          NEW_EXE="$(dirname "$EXE_PATH")/promptloom-installer-${VERSION_TAG}.exe"
+          NEW_NUPKG="$(dirname "$NUPKG_PATH")/promptloom-nupkg-${VERSION_TAG}.nupkg"
+          NEW_RELEASES="$(dirname "$RELEASES_PATH")/promptloom-releases-${VERSION_TAG}"
+
+          mv "$EXE_PATH" "$NEW_EXE"
+          mv "$NUPKG_PATH" "$NEW_NUPKG"
+          mv "$RELEASES_PATH" "$NEW_RELEASES"
+
+          echo "version_tag=$VERSION_TAG" >> "$GITHUB_OUTPUT"
+          echo "exe_path=$NEW_EXE" >> "$GITHUB_OUTPUT"
+          echo "nupkg_path=$NEW_NUPKG" >> "$GITHUB_OUTPUT"
+          echo "releases_path=$NEW_RELEASES" >> "$GITHUB_OUTPUT"
 
       - name: Upload installer (Setup.exe)
         id: upload-installer
         uses: actions/upload-artifact@v7
         with:
           # `name` is ignored by the action whenever archive: false — the
-          # artifact takes the name of the file it's given instead, and
-          # `path` only matches the one Setup.exe squirrel produces.
-          path: out/make/squirrel.windows/**/*.exe
+          # artifact takes the name of the file it's given instead, so the
+          # rename step above (when it ran) is what actually names this.
+          path: ${{ steps.artifact_names.outputs.exe_path || 'out/make/squirrel.windows/**/*.exe' }}
           retention-days: 14
           # Skip the action's own zip wrapper entirely rather than just
           # turning off its compression — Setup.exe is already a compressed
@@ -83,7 +136,7 @@ jobs:
         id: upload-nupkg
         uses: actions/upload-artifact@v7
         with:
-          path: out/make/squirrel.windows/**/*.nupkg
+          path: ${{ steps.artifact_names.outputs.nupkg_path || 'out/make/squirrel.windows/**/*.nupkg' }}
           retention-days: 14
           # Same reasoning as Setup.exe above — .nupkg is itself a
           # zip-based package format, so there's nothing to gain from
@@ -94,7 +147,7 @@ jobs:
         id: upload-releases
         uses: actions/upload-artifact@v7
         with:
-          path: out/make/squirrel.windows/**/RELEASES
+          path: ${{ steps.artifact_names.outputs.releases_path || 'out/make/squirrel.windows/**/RELEASES' }}
           retention-days: 14
           archive: false
 
@@ -104,7 +157,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          LABEL_SUFFIX="${{ steps.artifact_names.outputs.version_tag || steps.vars.outputs.sha_short }}"
           gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`:
-          - [promptloom-installer-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-installer.outputs.artifact-url }})
-          - [promptloom-nupkg-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-nupkg.outputs.artifact-url }})
-          - [promptloom-releases-${{ steps.vars.outputs.sha_short }}](${{ steps.upload-releases.outputs.artifact-url }})"
+          - [promptloom-installer-${LABEL_SUFFIX}](${{ steps.upload-installer.outputs.artifact-url }})
+          - [promptloom-nupkg-${LABEL_SUFFIX}](${{ steps.upload-nupkg.outputs.artifact-url }})
+          - [promptloom-releases-${LABEL_SUFFIX}](${{ steps.upload-releases.outputs.artifact-url }})"
