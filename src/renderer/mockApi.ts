@@ -13,6 +13,7 @@ function placeholderImage(color: string): string {
 let nextCategoryId = 3;
 let nextItemId = 4;
 let nextGenerationId = 4;
+let currentStash = 'Unsorted';
 
 const categories: Category[] = [
   { id: 1, name: 'Pose' },
@@ -128,7 +129,10 @@ export const mockApi: PromptLoomApi = {
   saveGenerationAs: async () => null,
 
   populatePrompt: async () => undefined,
-  setCurrentStash: async () => undefined,
+  getCurrentStash: async () => currentStash,
+  setCurrentStash: async (name) => {
+    currentStash = name;
+  },
   setPerchanceHidden: async () => undefined,
   onPerchanceStatus: (callback) => {
     callback({ connected: true, url: 'https://perchance.org/ai-text-to-image-generator' });

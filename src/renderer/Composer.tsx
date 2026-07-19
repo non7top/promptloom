@@ -4,6 +4,7 @@ import type { Category, Item } from '../shared/types';
 interface Props {
   categories: Category[];
   items: Item[];
+  onStashChange?: (name: string) => void;
 }
 
 function cartesianProduct(
@@ -18,7 +19,7 @@ function cartesianProduct(
   }, []);
 }
 
-export default function Composer({ categories, items }: Props) {
+export default function Composer({ categories, items, onStashChange }: Props) {
   const [selected, setSelected] = useState<Record<number, Set<number>>>({});
   const [stashName, setStashName] = useState('');
   const [seed, setSeed] = useState('');
@@ -90,6 +91,7 @@ export default function Composer({ categories, items }: Props) {
     const name = stashName.trim() || `Stash ${new Date().toLocaleString()}`;
     setStashName(name);
     await window.promptloom.setCurrentStash(name);
+    onStashChange?.(name);
     const generated = cartesianProduct(categoriesWithItems, selected);
     setCombos(generated);
     setComboIndex(0);

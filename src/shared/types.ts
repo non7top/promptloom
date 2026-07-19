@@ -60,6 +60,7 @@ export interface PromptLoomApi {
   saveGenerationAs(id: number): Promise<string | null>;
 
   populatePrompt(promptText: string): Promise<void>;
+  getCurrentStash(): Promise<string>;
   setCurrentStash(name: string): Promise<void>;
   setPerchanceHidden(hidden: boolean): Promise<void>;
   onPerchanceStatus(callback: (status: PerchanceStatus) => void): () => void;

@@ -11,6 +11,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [activeStash, setActiveStash] = useState('');
 
   const reload = async () => {
     const [nextCategories, nextItems] = await Promise.all([
@@ -25,7 +26,17 @@ export default function App() {
     // Initial IPC data load on mount, not a subscription to an external system.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
+    // Composer sets this when a batch run starts, but images saved from a
+    // prompt typed straight into perchance (no Composer run at all) land
+    // wherever this already was — load its current value rather than
+    // assuming 'Unsorted', so this control reflects reality on open.
+    window.promptloom.getCurrentStash().then(setActiveStash);
   }, []);
+
+  const updateActiveStash = (name: string) => {
+    setActiveStash(name);
+    window.promptloom.setCurrentStash(name);
+  };
 
   useEffect(() => {
     // #sidebar is static markup in index.html, outside this component's own
@@ -57,6 +68,20 @@ export default function App() {
           {rightPanelCollapsed ? '⇤' : '⇥'}
         </button>
       </nav>
+      {/* Composer sets this automatically when starting a batch, but
+          prompts typed directly into perchance (no Composer run at all)
+          need somewhere to set it manually — always visible, not tied to
+          any one tab, since perchance's own save button can fire from
+          whichever tab happens to be open. */}
+      <div className="active-stash">
+        <label htmlFor="active-stash-input">Saving to</label>
+        <input
+          id="active-stash-input"
+          value={activeStash}
+          onChange={(e) => updateActiveStash(e.target.value)}
+          placeholder="Unsorted"
+        />
+      </div>
       {tab === 'definitions' && (
         <DefinitionManager categories={categories} items={items} onChange={reload} />
       )}
@@ -64,7 +89,7 @@ export default function App() {
           tabs) so switching away and back doesn't lose the in-progress
           checkbox selection, seed, or running combo. */}
       <div style={{ display: tab === 'composer' ? 'block' : 'none' }}>
-        <Composer categories={categories} items={items} />
+        <Composer categories={categories} items={items} onStashChange={setActiveStash} />
       </div>
       {tab === 'gallery' && <Gallery />}
     </div>
