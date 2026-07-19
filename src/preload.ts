@@ -13,6 +13,8 @@ const api: PromptLoomApi = {
   updateItem: (id, name, promptFragment) =>
     ipcRenderer.invoke('items:update', id, name, promptFragment),
   deleteItem: (id) => ipcRenderer.invoke('items:delete', id),
+  exportDefinitions: () => ipcRenderer.invoke('definitions:export'),
+  importDefinitions: () => ipcRenderer.invoke('definitions:import'),
 
   listGenerations: () => ipcRenderer.invoke('generations:list'),
   saveGeneration: (batchLabel, promptText, selection, seed, imageDataUrl) =>

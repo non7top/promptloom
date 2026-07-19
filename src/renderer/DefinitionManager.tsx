@@ -9,6 +9,7 @@ interface Props {
 
 export default function DefinitionManager({ categories, items, onChange }: Props) {
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [importExportStatus, setImportExportStatus] = useState<string | null>(null);
 
   const addCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,6 +17,22 @@ export default function DefinitionManager({ categories, items, onChange }: Props
     if (!name) return;
     await window.promptloom.createCategory(name);
     setNewCategoryName('');
+    onChange();
+  };
+
+  const exportDefinitions = async () => {
+    const filePath = await window.promptloom.exportDefinitions();
+    setImportExportStatus(filePath ? `Exported to ${filePath}` : null);
+  };
+
+  const importDefinitions = async () => {
+    const result = await window.promptloom.importDefinitions();
+    if (!result) return;
+    setImportExportStatus(
+      `Imported: ${result.categoriesCreated} categor${result.categoriesCreated === 1 ? 'y' : 'ies'} added, ` +
+        `${result.itemsCreated} item${result.itemsCreated === 1 ? '' : 's'} added, ` +
+        `${result.itemsUpdated} item${result.itemsUpdated === 1 ? '' : 's'} updated`,
+    );
     onChange();
   };
 
@@ -31,6 +48,12 @@ export default function DefinitionManager({ categories, items, onChange }: Props
           Add
         </button>
       </form>
+
+      <div>
+        <button onClick={exportDefinitions}>Export definitions</button>
+        <button onClick={importDefinitions}>Import definitions</button>
+        {importExportStatus && <p className="hint">{importExportStatus}</p>}
+      </div>
 
       {categories.map((category) => (
         <CategorySection

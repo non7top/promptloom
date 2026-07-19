@@ -91,6 +91,90 @@ export function deleteItem(id: number): void {
   db.prepare('DELETE FROM items WHERE id = ?').run(id);
 }
 
+// Same `// Category:Item` comment format Composer.tsx puts ahead of each
+// fragment in the populated prompt, so a stash's saved prompts already
+// double as documentation of how to reconstruct the definitions that
+// produced them — export/import just reuses that format directly rather
+// than inventing a separate one.
+export function exportDefinitionsText(): string {
+  const categoryNameById = new Map(listCategories().map((category) => [category.id, category.name]));
+  return listItems()
+    .map((item) => {
+      const categoryName = categoryNameById.get(item.categoryId);
+      return categoryName ? `// ${categoryName}:${item.name}\n${item.promptFragment}` : null;
+    })
+    .filter((section): section is string => Boolean(section))
+    .join('\n\n');
+}
+
+interface DefinitionEntry {
+  categoryName: string;
+  itemName: string;
+  promptFragment: string;
+}
+
+function parseDefinitionsText(text: string): DefinitionEntry[] {
+  const entries: DefinitionEntry[] = [];
+  let current: { categoryName: string; itemName: string; fragmentLines: string[] } | null = null;
+
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const header = /^\/\/ (.+?):(.*)$/.exec(line);
+    if (header) {
+      if (current) {
+        entries.push({ ...current, promptFragment: current.fragmentLines.join('\n').trim() });
+      }
+      current = { categoryName: header[1].trim(), itemName: header[2].trim(), fragmentLines: [] };
+    } else if (current) {
+      current.fragmentLines.push(line);
+    }
+  }
+  if (current) {
+    entries.push({ ...current, promptFragment: current.fragmentLines.join('\n').trim() });
+  }
+
+  return entries.filter((entry) => entry.categoryName && entry.itemName && entry.promptFragment);
+}
+
+export interface DefinitionsImportResult {
+  categoriesCreated: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+}
+
+// Upserts by (category name, item name) rather than blindly inserting, so
+// re-importing the same export (or one edited outside the app) updates
+// fragments in place instead of piling up duplicates.
+export function importDefinitionsText(text: string): DefinitionsImportResult {
+  const categoryIdByName = new Map(listCategories().map((category) => [category.name, category.id]));
+  const itemIdByKey = new Map(
+    listItems().map((item) => [`${item.categoryId}:${item.name}`, item.id]),
+  );
+
+  const result: DefinitionsImportResult = { categoriesCreated: 0, itemsCreated: 0, itemsUpdated: 0 };
+
+  for (const entry of parseDefinitionsText(text)) {
+    let categoryId = categoryIdByName.get(entry.categoryName);
+    if (categoryId === undefined) {
+      categoryId = createCategory(entry.categoryName).id;
+      categoryIdByName.set(entry.categoryName, categoryId);
+      result.categoriesCreated += 1;
+    }
+
+    const key = `${categoryId}:${entry.itemName}`;
+    const existingItemId = itemIdByKey.get(key);
+    if (existingItemId !== undefined) {
+      updateItem(existingItemId, entry.itemName, entry.promptFragment);
+      result.itemsUpdated += 1;
+    } else {
+      const item = createItem(categoryId, entry.itemName, entry.promptFragment);
+      itemIdByKey.set(key, item.id);
+      result.itemsCreated += 1;
+    }
+  }
+
+  return result;
+}
+
 export function listGenerations(): Generation[] {
   const rows = db
     .prepare(

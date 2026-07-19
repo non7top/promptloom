@@ -10,6 +10,12 @@ export interface Item {
   promptFragment: string;
 }
 
+export interface DefinitionsImportResult {
+  categoriesCreated: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+}
+
 export interface Generation {
   id: number;
   batchLabel: string;
@@ -37,6 +43,8 @@ export interface PromptLoomApi {
   createItem(categoryId: number, name: string, promptFragment: string): Promise<Item>;
   updateItem(id: number, name: string, promptFragment: string): Promise<void>;
   deleteItem(id: number): Promise<void>;
+  exportDefinitions(): Promise<string | null>;
+  importDefinitions(): Promise<DefinitionsImportResult | null>;
 
   listGenerations(): Promise<Generation[]>;
   saveGeneration(
