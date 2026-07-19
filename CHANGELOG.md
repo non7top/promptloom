@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/non7top/promptloom/compare/v1.2.0...v1.2.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **ci:** trigger the release workflow off release-please, not push:tags ([37cf37a](https://github.com/non7top/promptloom/commit/37cf37ad25ef538edac0ddc20c17c23a69921043))
+* **ci:** trigger the release workflow off release-please, not push:tags ([72d9a05](https://github.com/non7top/promptloom/commit/72d9a0599ed718d47ade472eade4984acf997a59))
+
 ## [1.2.0](https://github.com/non7top/promptloom/compare/v1.1.0...v1.2.0) (2026-07-19)
 
 
