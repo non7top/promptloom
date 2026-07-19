@@ -121,7 +121,9 @@ export function listGenerations(): Generation[] {
 // readable/portable straight from the stash folder on disk, not just the
 // app's own database.
 export function sidecarText(promptText: string, seed: string | null): string {
-  return `Prompt: ${promptText}\nSeed: ${seed ?? 'unknown'}\n`;
+  // perchance's own syntax for forcing a specific seed when the prompt text
+  // is pasted back in, so a sidecar file is enough to reproduce a result.
+  return `Prompt: ${promptText}\nSeed: ${seed ? `(seed:::${seed})` : 'unknown'}\n`;
 }
 
 export function saveGeneration(

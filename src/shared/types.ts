@@ -55,4 +55,5 @@ export interface PromptLoomApi {
   setCurrentStash(name: string): Promise<void>;
   setPerchanceHidden(hidden: boolean): Promise<void>;
   onPerchanceStatus(callback: (status: PerchanceStatus) => void): () => void;
+  onGenerationSaved(callback: (generation: Generation) => void): () => void;
 }

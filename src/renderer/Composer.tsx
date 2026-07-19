@@ -51,28 +51,30 @@ export default function Composer({ categories, items }: Props) {
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
 
-  // The actual prompt sent to perchance — plain comma-joined fragments.
-  // Text-to-image models don't parse any kind of comment syntax; anything
-  // added here becomes literal conditioning text the model sees, so this
-  // stays free of section labels/seed noise.
-  const plainPromptFor = (combo: Record<number, number>): string =>
-    categoriesWithItems
-      .map((category) => items.find((item) => item.id === combo[category.id])?.promptFragment)
-      .filter((fragment): fragment is string => Boolean(fragment))
-      .join(', ');
+  // The seed field may already hold perchance's own `(seed:::N)` syntax —
+  // e.g. pasted from Gallery's "Copy seed" button — rather than a bare
+  // number, so don't blindly re-wrap an already-formatted value.
+  const formattedSeed = (raw: string): string => {
+    const trimmed = raw.trim();
+    return /^\(seed:::.*\)$/.test(trimmed) ? trimmed : `(seed:::${trimmed})`;
+  };
 
-  // Reference-only breakdown (which category contributed what, plus the
-  // seed) — shown on screen so a combination can be reconstructed later,
-  // never sent to perchance itself.
-  const referenceTextFor = (combo: Record<number, number>): string => {
+  // Each chunk gets a `// Category:Item` comment line ahead of its
+  // fragment, right in the prompt that's actually populated into perchance.
+  // That prompt is also what gets read back and stored verbatim (sidecar
+  // .txt, Gallery tooltip) once an image is saved, so naming the exact item
+  // (not just its category) is what makes a saved prompt re-importable —
+  // reconstructing the selection later doesn't depend on matching fragment
+  // text back to an item.
+  const plainPromptFor = (combo: Record<number, number>): string => {
     const sections = categoriesWithItems
       .map((category) => {
-        const fragment = items.find((item) => item.id === combo[category.id])?.promptFragment;
-        return fragment ? `${category.name}: ${fragment}` : null;
+        const item = items.find((candidate) => candidate.id === combo[category.id]);
+        return item?.promptFragment ? `// ${category.name}:${item.name}\n${item.promptFragment}` : null;
       })
       .filter((section): section is string => Boolean(section));
-    const body = sections.join('\n');
-    return seed.trim() ? `${body}\nSeed: ${seed.trim()}` : body;
+    const body = sections.join('\n\n');
+    return seed.trim() ? `${body}\n\n${formattedSeed(seed)}` : body;
   };
 
   const populate = async (combo: Record<number, number>) => {

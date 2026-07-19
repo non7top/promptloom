@@ -132,4 +132,5 @@ export const mockApi: PromptLoomApi = {
     callback({ connected: true, url: 'https://perchance.org/ai-text-to-image-generator' });
     return () => undefined;
   },
+  onGenerationSaved: () => () => undefined,
 };

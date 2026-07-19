@@ -90,7 +90,19 @@ export function registerIpcHandlers(): void {
   ipcMain.on(
     'perchance:saveImage',
     (_event, imageDataUrl: string, prompt: string, seed: string | null) => {
-      db.saveGeneration(currentStash, prompt || '(prompt unavailable)', {}, seed, imageDataUrl);
+      const generation = db.saveGeneration(
+        currentStash,
+        prompt || '(prompt unavailable)',
+        {},
+        seed,
+        imageDataUrl,
+      );
+      // Perchance's save button lives in a separate native WebContentsView,
+      // not the app's own renderer — the Gallery has no other way to learn
+      // a new image landed, so push it a confirmation to refresh from.
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('generations:saved', generation);
+      }
     },
   );
 }
