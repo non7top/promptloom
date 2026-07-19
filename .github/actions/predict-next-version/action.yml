@@ -108,11 +108,19 @@ runs:
         fi
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
-        # The full dry-run log is mostly internal debug/backfill noise —
-        # keep just the "would open this PR" summary through the generated
-        # changelog, dropping the file-update trace after it, for the
-        # comment posted below.
-        sed -n '/^Would open/,/^updates:/p' dryrun-output.txt | sed '$d' > trimmed-output.txt
+        # The `body:` field is the exact markdown release-please would put
+        # in the real release PR/GitHub release — already valid Markdown
+        # (headings, links, bold), not a code block to be displayed
+        # verbatim. Strip the "body: " prefix from its first line and keep
+        # everything through the line before "updates: N" (a separate,
+        # non-body debug field the CLI dumps after it), dropping the
+        # fork/title/branch/draft debug lines before it entirely — this
+        # comment's own header already says what would happen.
+        awk '
+          /^body: / { print substr($0, 7); capturing=1; next }
+          capturing && /^updates: [0-9]+$/ { exit }
+          capturing { print }
+        ' dryrun-output.txt > trimmed-output.txt
 
     - name: Remove previous preview comment
       if: inputs.post-comment == 'true'
@@ -141,9 +149,7 @@ runs:
           echo "What merging this PR into \`master\` would trigger:"
           echo
           if [ "${{ steps.extract.outputs.would_release }}" = true ]; then
-            echo '```'
             cat trimmed-output.txt
-            echo '```'
           else
             echo "No releasable changes detected."
           fi
