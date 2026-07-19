@@ -95,13 +95,46 @@ export async function populatePrompt(promptText: string): Promise<void> {
 // can get replaced by a re-render.
 const ATTACH_SAVE_LISTENER_SCRIPT = `
 (() => {
+  // Tracked by dataUrl (not container element) since perchance's own
+  // re-renders can replace a container wholesale — surviving that is the
+  // same reason the button-reattach logic below re-scans on an interval
+  // and on every DOM mutation, rather than attaching once and assuming it
+  // sticks. Session-only (a fresh page load starts empty), which matches
+  // the actual complaint: losing track of what's saved *within* a batch of
+  // generations, not across restarting the app entirely.
+  window.__promptloomSavedDataUrls = window.__promptloomSavedDataUrls || new Set();
+  const SAVED_MARKER_CLASS = 'promptloom-saved-marker';
+
+  function outputFor(container) {
+    const iframe = container && container.querySelector ? container.querySelector('iframe') : null;
+    return iframe && iframe.textToImagePluginOutput;
+  }
+
+  function markSaved(container) {
+    if (!container || container.querySelector('.' + SAVED_MARKER_CLASS)) return;
+    // Containing block for the absolutely-positioned badge below — only
+    // force this if the container doesn't already establish one itself.
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
+    const badge = document.createElement('div');
+    badge.className = SAVED_MARKER_CLASS;
+    badge.textContent = '✓ Saved';
+    badge.style.cssText =
+      'position:absolute;top:4px;right:4px;background:#2ecc71;color:#fff;' +
+      'font:bold 11px sans-serif;padding:2px 6px;border-radius:4px;' +
+      'pointer-events:none;z-index:9999;';
+    container.appendChild(badge);
+  }
+
   function captureAndSave(container) {
     try {
-      const iframe = container && container.querySelector ? container.querySelector('iframe') : null;
-      const output = iframe && iframe.textToImagePluginOutput;
+      const output = outputFor(container);
       if (output && output.dataUrl && output.inputs) {
         const seed = output.inputs.seed != null ? String(output.inputs.seed) : null;
         window.promptloomBridge.saveImage(output.dataUrl, output.inputs.prompt || '', seed);
+        window.__promptloomSavedDataUrls.add(output.dataUrl);
+        markSaved(container);
       }
     } catch (err) {
       console.error('[PromptLoom] failed to capture image for save', err);
@@ -126,6 +159,12 @@ const ATTACH_SAVE_LISTENER_SCRIPT = `
 
   function scan() {
     document.querySelectorAll('.private-save-button').forEach(attach);
+    document.querySelectorAll('.t2i-image-ctn').forEach((container) => {
+      const output = outputFor(container);
+      if (output && output.dataUrl && window.__promptloomSavedDataUrls.has(output.dataUrl)) {
+        markSaved(container);
+      }
+    });
   }
 
   scan();
