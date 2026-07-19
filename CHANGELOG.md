@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/non7top/promptloom/compare/v1.1.0...v1.2.0) (2026-07-19)
+
+
+### Features
+
+* **ci:** name PR build artifacts with the predicted version ([2285bf2](https://github.com/non7top/promptloom/commit/2285bf24c6e4b5bacbd4bf545f407e6175f0e06d))
+* **definitions:** add export/import for categories and items ([e2ed262](https://github.com/non7top/promptloom/commit/e2ed262ba7f51c2e2e18bd57319ed6b64f393e27))
+
+
+### Bug Fixes
+
+* **ci:** render the release-please changelog as markdown, not a code block ([b8bd0e3](https://github.com/non7top/promptloom/commit/b8bd0e37408d1b5dc86e7a02ce54cbb536f2755a))
+* **ci:** simulate the real merge commit in the release-please preview ([f8898b9](https://github.com/non7top/promptloom/commit/f8898b9d0d3165d39b32d45f60e509fb81a4d376))
+
 ## [1.1.0](https://github.com/non7top/promptloom/compare/v1.0.0...v1.1.0) (2026-07-19)
 
 
