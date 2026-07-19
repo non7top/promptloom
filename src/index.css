@@ -200,6 +200,20 @@ input {
   overflow: hidden;
 }
 
+.active-stash {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.active-stash input {
+  flex: 1;
+  min-width: 0;
+}
+
 .tabs button {
   flex: 1;
   border: none;

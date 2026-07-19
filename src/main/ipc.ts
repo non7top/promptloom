@@ -105,6 +105,7 @@ export function registerIpcHandlers(): void {
     setPerchanceViewHidden(hidden),
   );
 
+  ipcMain.handle('stash:getCurrent', () => currentStash);
   ipcMain.handle('stash:setCurrent', (_event, name: string) => {
     currentStash = name;
   });

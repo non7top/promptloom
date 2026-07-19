@@ -26,6 +26,7 @@ const api: PromptLoomApi = {
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
 
   populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
+  getCurrentStash: () => ipcRenderer.invoke('stash:getCurrent'),
   setCurrentStash: (name) => ipcRenderer.invoke('stash:setCurrent', name),
   setPerchanceHidden: (hidden) => ipcRenderer.invoke('perchance:setHidden', hidden),
   onPerchanceStatus: (callback) => {
