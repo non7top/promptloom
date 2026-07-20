@@ -40,3 +40,11 @@ publish:
   provider: github
   owner: non7top
   repo: promptloom
+  # electron-builder defaults to publishing a *draft* release and refuses
+  # to touch a release of a different type than the one already published —
+  # release-please already creates a normal (non-draft) release for this
+  # tag before this workflow runs, so without this the v2.0.0 release
+  # shipped with only the cosign signature attached and no installer at
+  # all ("existing type not compatible with publishing type" in the
+  # electron-builder log, silently skipping every upload).
+  releaseType: release

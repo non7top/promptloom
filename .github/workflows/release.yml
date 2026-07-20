@@ -4,6 +4,14 @@ on:
   workflow_run:
     workflows: ["release-please"]
     types: [completed]
+  # Escape hatch to (re)build and publish an already-tagged release without
+  # waiting for a new release-please cycle — e.g. to backfill a release
+  # whose assets failed to upload for a reason unrelated to the tag itself.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to (re)build and publish, e.g. v2.0.0'
+        required: true
 
 jobs:
   # release-please-action creates its tag/release using the default
@@ -15,7 +23,7 @@ jobs:
   # cut a release, so check whether this particular run actually did by
   # looking for a semver tag on its exact commit before building anything.
   check-release-tag:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.find_tag.outputs.tag }}
@@ -25,9 +33,10 @@ jobs:
           # workflow_run doesn't check out the commit that triggered it by
           # default — it checks out the default branch's current tip, which
           # may have moved on since. Pin to the exact commit release-please
-          # just processed, and fetch tags explicitly since fetch-depth: 0
-          # alone doesn't guarantee it.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # just processed (or, for a manual backfill, the given tag), and
+          # fetch tags explicitly since fetch-depth: 0 alone doesn't
+          # guarantee it.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.workflow_run.head_sha }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -35,12 +44,16 @@ jobs:
         id: find_tag
         shell: bash
         run: |
-          # grep exits 1 when no tag matches (the normal case for a non-
-          # release merge) — under this step's `-e -o pipefail` shell, that
-          # would otherwise fail the whole step instead of just yielding an
-          # empty $TAG, which is the expected, already-handled case (see the
-          # `release` job's `if: needs.check-release-tag.outputs.tag != ''`).
-          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            # grep exits 1 when no tag matches (the normal case for a non-
+            # release merge) — under this step's `-e -o pipefail` shell,
+            # that would otherwise fail the whole step instead of just
+            # yielding an empty $TAG, which is the expected, already-
+            # handled case (see the `release` job's `if:` below).
+            TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   release:
@@ -55,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.check-release-tag.outputs.tag }}
 
       - uses: actions/setup-node@v7
         with:
