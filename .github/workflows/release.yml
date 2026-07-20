@@ -44,6 +44,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      # Keyless cosign signing exchanges this job's OIDC token for a
+      # short-lived Fulcio cert — no signing key ever touches the repo.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -65,3 +68,32 @@ jobs:
           # convention) — set both since nothing else here reads either.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: sigstore/cosign-installer@v3
+
+      # Keyless: cosign trades this job's GitHub OIDC token for a
+      # short-lived Fulcio cert and records the signature in the public
+      # Rekor log, so there's no private key to hold or leak. Signs
+      # whatever the maker produced locally (already uploaded by the
+      # publish step above) rather than re-downloading from the release.
+      # electron-builder's NSIS target produces a single installer .exe in
+      # dist/ — no .nupkg/RELEASES equivalents (those were Squirrel-only
+      # update-feed files).
+      - name: Sign release artifacts (cosign, keyless)
+        id: cosign_sign
+        shell: bash
+        run: |
+          shopt -s nullglob
+          bundles=()
+          for f in dist/*.exe; do
+            cosign sign-blob --yes --bundle "$f.cosign.bundle" "$f"
+            bundles+=("$f.cosign.bundle")
+          done
+          printf '%s\n' "${bundles[@]}" > cosign_bundles.txt
+          cat cosign_bundles.txt
+
+      - name: Upload signature bundles to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.check-release-tag.outputs.tag }}" $(cat cosign_bundles.txt) --clobber --repo non7top/promptloom
