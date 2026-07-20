@@ -78,8 +78,15 @@ Dev/build:
   electron-builder has no built-in fuses support.
 - `vite`, `@vitejs/plugin-react` — bundling, driven by `electron.vite.config.ts`
 - `typescript`, `@types/node`, `@types/react`, `@types/react-dom` — type-checking
-- `eslint` + `@typescript-eslint/*` + `eslint-plugin-import` +
-  `eslint-plugin-react` + `eslint-plugin-react-hooks` — linting
+- `@biomejs/biome` — linting (`biome.json`; formatter/import-sorting deliberately
+  left off, this only replaces the old eslint linting setup)
+
+Previously linted with `eslint` + `@typescript-eslint/*` + `eslint-plugin-import` +
+`eslint-plugin-react` + `eslint-plugin-react-hooks`; switched to Biome because
+`@typescript-eslint` depends on TypeScript's own compiler API to parse/type-check,
+which structurally can't keep pace with TypeScript's release cadence — it capped
+us at `typescript <6.1.0` while upstream was already at `7.x`. Biome ships its own
+TS/JSX parser independent of `tsc`, so it isn't hostage to that lag.
 
 Previously built on `@electron-forge/cli` + `plugin-vite`; migrated off it
 because forge's Vite integration is explicitly non-production per its own
