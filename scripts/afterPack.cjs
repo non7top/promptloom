@@ -5,9 +5,12 @@
 // to electron-builder either — this is the documented way to use it from
 // any packager's post-pack hook.
 const path = require('node:path');
-const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
 exports.default = async function afterPack(context) {
+  // @electron/fuses is ESM-only as of 2.0.0 (electron/fuses#67) — a plain
+  // require() throws ERR_REQUIRE_ESM there, so import it dynamically. Works
+  // the same for both the old CJS 1.x and the new ESM 2.x releases.
+  const { flipFuses, FuseVersion, FuseV1Options } = await import('@electron/fuses');
   const { appOutDir, packager, electronPlatformName } = context;
   const productFilename = packager.appInfo.productFilename;
 
