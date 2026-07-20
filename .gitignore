@@ -85,11 +85,12 @@ typings/
 # Webpack
 .webpack/
 
-# Vite
+# Vite / electron-vite
 .vite/
-
-# Electron-Forge
 out/
+
+# electron-builder
+dist/
 
 # App-generated data (definitions DB, captured generations)
 data/

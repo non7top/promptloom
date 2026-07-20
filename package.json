@@ -3,13 +3,14 @@
   "productName": "PromptLoom",
   "version": "1.4.0",
   "description": "A companion app for keeping track of prompt/seed combinations while working on sprites for visual novels, using perchance.org's AI text-to-image generator. Not intended to bypass any restrictions of the platform or otherwise abuse it.",
-  "main": ".vite/build/main.js",
+  "main": "out/main/index.js",
   "private": true,
   "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
+    "start": "electron-vite dev",
+    "build": "electron-vite build",
+    "package": "electron-vite build && electron-builder --dir",
+    "make": "electron-vite build && electron-builder",
+    "publish": "electron-vite build && electron-builder --publish always",
     "lint": "eslint --ext .ts,.tsx ."
   },
   "keywords": [],
@@ -19,16 +20,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@electron-forge/cli": "^7.11.2",
-    "@electron-forge/maker-deb": "^7.11.2",
-    "@electron-forge/maker-rpm": "^7.11.2",
-    "@electron-forge/maker-squirrel": "^7.11.2",
-    "@electron-forge/maker-zip": "^7.11.2",
-    "@electron-forge/plugin-fuses": "^7.11.2",
-    "@electron-forge/publisher-github": "^7.11.2",
-    "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
-    "@types/electron-squirrel-startup": "^1.0.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -36,16 +28,17 @@
     "@typescript-eslint/parser": "^8.64.0",
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "^5.3.3",
-    "vite": "^5.4.21"
+    "vite": "^7.3.6"
   },
   "dependencies": {
     "electron-context-menu": "^4.1.2",
-    "electron-squirrel-startup": "^1.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }

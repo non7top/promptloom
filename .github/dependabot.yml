@@ -12,29 +12,26 @@ updates:
     commit-message:
       prefix: "chore"
       prefix-development: "chore"
-    groups:
-      electron-forge:
-        patterns:
-          - "@electron-forge/*"
-          - "@electron/*"
     ignore:
-      # @electron-forge/plugin-vite@7.11.2 requires vite@^5 as a peer;
-      # bumping past that breaks the build until the plugin supports it.
+      # electron-vite@5.0.0 (our build tool, replacing @electron-forge/
+      # plugin-vite) peer-pins vite to ^5 || ^6 || ^7 — a vite 8 bump breaks
+      # the build until electron-vite ships support for it.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
+      # @vitejs/plugin-react@^4.7.0 already supports vite up through ^7; its
+      # own next major (6.x) requires vite@^8, which we can't take yet per
+      # the vite ignore above — bumping this alone would force that.
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
-      # @electron-forge/plugin-fuses@7.11.2 requires @electron/fuses@^1.0.0
-      # as a peer; the same conflict we hit setting this up originally.
-      - dependency-name: "@electron/fuses"
-        update-types: ["version-update:semver-major"]
-      # @typescript-eslint/* is pinned at 5.62.0 and can't parse whatever a
-      # major TS bump changes internally — needs a coordinated upgrade of
-      # typescript + @typescript-eslint/* together, not a piecemeal one.
+      # @typescript-eslint/*@8.64.0 only parses typescript >=4.8.4 <6.1.0;
+      # typescript itself is already past that (7.x) — bumping our
+      # typescript pin needs a coordinated @typescript-eslint bump first,
+      # not a piecemeal one.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # ESLint 9+ dropped .eslintrc.json support (flat config only) —
-      # migrating is a deliberate task, not a piecemeal Dependabot bump.
+      # ESLint 9+ dropped .eslintrc.json support (flat config only), and
+      # eslint-plugin-import's peerDependencies still cap at ^9 (no 10 yet)
+      # — migrating is a deliberate task, not a piecemeal Dependabot bump.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
 

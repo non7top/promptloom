@@ -95,28 +95,21 @@ jobs:
       # Only meaningful for PR builds with a predicted release — plain
       # pushes to master (already merged, not previewing anything) and
       # no-releasable-change PRs keep the plain glob path below instead.
-      - name: Rename build artifacts to the predicted version
+      # electron-builder's NSIS target produces a single Setup .exe (no
+      # separate .nupkg/RELEASES — those were Squirrel-specific update-feed
+      # files; this app has no in-app auto-updater consuming them).
+      - name: Rename build artifact to the predicted version
         id: artifact_names
         if: github.event_name == 'pull_request' && steps.predict.outputs.version != ''
         shell: bash
         run: |
           VERSION_TAG="${{ steps.predict.outputs.version }}-rc${{ github.event.pull_request.number }}"
-          EXE_PATH=$(find out/make/squirrel.windows -name '*.exe' | head -1)
-          NUPKG_PATH=$(find out/make/squirrel.windows -name '*.nupkg' | head -1)
-          RELEASES_PATH=$(find out/make/squirrel.windows -name 'RELEASES' | head -1)
-
+          EXE_PATH=$(find dist -maxdepth 1 -name '*.exe' | head -1)
           NEW_EXE="$(dirname "$EXE_PATH")/promptloom-installer-${VERSION_TAG}.exe"
-          NEW_NUPKG="$(dirname "$NUPKG_PATH")/promptloom-nupkg-${VERSION_TAG}.nupkg"
-          NEW_RELEASES="$(dirname "$RELEASES_PATH")/promptloom-releases-${VERSION_TAG}"
-
           mv "$EXE_PATH" "$NEW_EXE"
-          mv "$NUPKG_PATH" "$NEW_NUPKG"
-          mv "$RELEASES_PATH" "$NEW_RELEASES"
 
           echo "version_tag=$VERSION_TAG" >> "$GITHUB_OUTPUT"
           echo "exe_path=$NEW_EXE" >> "$GITHUB_OUTPUT"
-          echo "nupkg_path=$NEW_NUPKG" >> "$GITHUB_OUTPUT"
-          echo "releases_path=$NEW_RELEASES" >> "$GITHUB_OUTPUT"
 
       - name: Upload installer (Setup.exe)
         id: upload-installer
@@ -125,33 +118,14 @@ jobs:
           # `name` is ignored by the action whenever archive: false — the
           # artifact takes the name of the file it's given instead, so the
           # rename step above (when it ran) is what actually names this.
-          path: ${{ steps.artifact_names.outputs.exe_path || 'out/make/squirrel.windows/**/*.exe' }}
+          path: ${{ steps.artifact_names.outputs.exe_path || 'dist/*.exe' }}
           retention-days: 14
           # Skip the action's own zip wrapper entirely rather than just
           # turning off its compression — Setup.exe is already a compressed
           # archive internally, so both were pure overhead.
           archive: false
 
-      - name: Upload update package (.nupkg)
-        id: upload-nupkg
-        uses: actions/upload-artifact@v7
-        with:
-          path: ${{ steps.artifact_names.outputs.nupkg_path || 'out/make/squirrel.windows/**/*.nupkg' }}
-          retention-days: 14
-          # Same reasoning as Setup.exe above — .nupkg is itself a
-          # zip-based package format, so there's nothing to gain from
-          # wrapping it in another zip.
-          archive: false
-
-      - name: Upload RELEASES manifest
-        id: upload-releases
-        uses: actions/upload-artifact@v7
-        with:
-          path: ${{ steps.artifact_names.outputs.releases_path || 'out/make/squirrel.windows/**/RELEASES' }}
-          retention-days: 14
-          archive: false
-
-      - name: Comment download links on PR
+      - name: Comment download link on PR
         if: github.event_name == 'pull_request'
         shell: bash
         env:
@@ -159,6 +133,4 @@ jobs:
         run: |
           LABEL_SUFFIX="${{ steps.artifact_names.outputs.version_tag || steps.vars.outputs.sha_short }}"
           gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`:
-          - [promptloom-installer-${LABEL_SUFFIX}](${{ steps.upload-installer.outputs.artifact-url }})
-          - [promptloom-nupkg-${LABEL_SUFFIX}](${{ steps.upload-nupkg.outputs.artifact-url }})
-          - [promptloom-releases-${LABEL_SUFFIX}](${{ steps.upload-releases.outputs.artifact-url }})"
+          - [promptloom-installer-${LABEL_SUFFIX}](${{ steps.upload-installer.outputs.artifact-url }})"
