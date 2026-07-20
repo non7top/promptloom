@@ -1,9 +1,9 @@
 repos:
   - repo: local
     hooks:
-      - id: eslint
-        name: eslint (docker)
-        description: Run eslint inside the dev container, same as CI.
+      - id: lint
+        name: biome lint (docker)
+        description: Run biome lint inside the dev container, same as CI.
         entry: docker compose run --rm dev npm run lint
         language: system
         files: \.(ts|tsx)$

@@ -42,12 +42,14 @@ export default function Gallery() {
     setGenerations(await window.promptloom.listGenerations());
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload is redefined every render (not memoized), so listing it would re-run this on every render instead of once on mount, which is what's intended here.
   useEffect(() => {
     // Initial IPC data load on mount, not a subscription to an external system.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload is redefined every render (not memoized); this subscribes once to onGenerationSaved and should not re-subscribe every render.
   useEffect(() => {
     // Perchance's own save button writes straight to the DB from the main
     // process, bypassing any renderer action of ours — this is the only

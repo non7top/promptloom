@@ -22,6 +22,7 @@ export default function App() {
     setItems(nextItems);
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload is redefined every render (not memoized), so listing it would re-run this on every render instead of once on mount, which is what's intended here.
   useEffect(() => {
     // Initial IPC data load on mount, not a subscription to an external system.
     // eslint-disable-next-line react-hooks/set-state-in-effect

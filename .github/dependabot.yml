@@ -23,17 +23,6 @@ updates:
       # the vite ignore above — bumping this alone would force that.
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
-      # @typescript-eslint/*@8.64.0 only parses typescript >=4.8.4 <6.1.0;
-      # typescript itself is already past that (7.x) — bumping our
-      # typescript pin needs a coordinated @typescript-eslint bump first,
-      # not a piecemeal one.
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      # ESLint 9+ dropped .eslintrc.json support (flat config only), and
-      # eslint-plugin-import's peerDependencies still cap at ^9 (no 10 yet)
-      # — migrating is a deliberate task, not a piecemeal Dependabot bump.
-      - dependency-name: "eslint"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
