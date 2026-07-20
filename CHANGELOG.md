@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/non7top/promptloom/compare/v2.0.1...v3.0.0) (2026-07-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace @typescript-eslint with Biome, upgrade typescript 5.3 -> 7.0
+
+### Features
+
+* replace [@typescript-eslint](https://github.com/typescript-eslint) with Biome, upgrade typescript 5.3 -&gt; 7.0 ([a196645](https://github.com/non7top/promptloom/commit/a196645ca71f3b972b1d78af7c692ce5b037b9de)), closes [#73](https://github.com/non7top/promptloom/issues/73)
+
 ## [2.0.1](https://github.com/non7top/promptloom/compare/v2.0.0...v2.0.1) (2026-07-20)
 
 
