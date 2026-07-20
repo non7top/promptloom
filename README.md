@@ -65,7 +65,6 @@ Kept deliberately short so pruning unused packages later is easy.
 
 Runtime:
 - `react`, `react-dom` — renderer UI (Definitions/Composer)
-- `electron-squirrel-startup` — handles Windows install/uninstall shortcuts
 - `electron-context-menu` — Electron shows no right-click menu anywhere by
   default; this adds the standard cut/copy/paste/inspect-element menu
 
@@ -73,16 +72,19 @@ Storage uses Node's built-in `node:sqlite` (stable in the Node version
 Electron 43 bundles) — no SQLite dependency needed.
 
 Dev/build:
-- `electron`, `@electron-forge/cli` + `plugin-vite` + `plugin-fuses` +
-  `maker-squirrel`/`maker-zip`/`maker-deb`/`maker-rpm` + `publisher-github` +
-  `@electron/fuses` — build, package, and publish the app
-- `vite`, `@vitejs/plugin-react` — bundling; the React plugin is pinned to
-  the 4.x line (not the latest 6.x) because `@electron-forge/plugin-vite`
-  currently requires Vite 5
-- `typescript`, `@types/node`, `@types/react`, `@types/react-dom`,
-  `@types/electron-squirrel-startup` — type-checking
+- `electron`, `electron-vite`, `electron-builder`, `@electron/fuses` — build,
+  package, and publish the app. `@electron/fuses` is applied directly via
+  `scripts/afterPack.cjs` (an electron-builder `afterPack` hook), since
+  electron-builder has no built-in fuses support.
+- `vite`, `@vitejs/plugin-react` — bundling, driven by `electron.vite.config.ts`
+- `typescript`, `@types/node`, `@types/react`, `@types/react-dom` — type-checking
 - `eslint` + `@typescript-eslint/*` + `eslint-plugin-import` +
   `eslint-plugin-react` + `eslint-plugin-react-hooks` — linting
+
+Previously built on `@electron-forge/cli` + `plugin-vite`; migrated off it
+because forge's Vite integration is explicitly non-production per its own
+maintainers (electron/forge#4067) and pinned to vite@^5 with no updated
+release in sight.
 
 ## Packaging
 
@@ -90,6 +92,6 @@ Dev/build:
 docker compose run --rm dev npm run make
 ```
 
-Windows installers are built by CI on a `windows-latest` runner (see
-`.github/workflows/release.yml`), since Squirrel packaging targets Windows
-specifically.
+Windows installers (NSIS) are built by CI on a `windows-latest` runner (see
+`.github/workflows/release.yml`) — electron-builder's NSIS/deb/rpm targets
+all cross-build from Linux except Windows's, which needs a real Windows host.

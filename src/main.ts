@@ -1,6 +1,5 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
-import started from 'electron-squirrel-startup';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers } from './main/ipc';
@@ -14,11 +13,6 @@ import type { PerchanceStatus } from './shared/types';
 contextMenu({
   showInspectElement: true,
 });
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
-}
 
 // Container/Xvfb dev environments often can't launch any GPU process at all
 // (even for software rasterization); only opt out there, not in the real
@@ -46,18 +40,18 @@ const createWindow = () => {
     width: 1280,
     height: 860,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/preload.js'),
     },
   });
 
-  // and load the index.html of the app.
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+  // and load the index.html of the app. electron-vite sets
+  // ELECTRON_RENDERER_URL in dev (HMR dev server); in a packaged build it's
+  // unset and the renderer is loaded from its built output instead.
+  if (process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
   // Right-click "Inspect Element" doesn't work inside the perchance

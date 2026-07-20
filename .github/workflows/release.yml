@@ -60,4 +60,8 @@ jobs:
       - name: Publish (build installer + create GitHub release)
         run: npm run publish
         env:
+          # electron-builder's GitHub publisher reads GH_TOKEN specifically
+          # (not GITHUB_TOKEN, which was electron-forge's PublisherGithub
+          # convention) — set both since nothing else here reads either.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
