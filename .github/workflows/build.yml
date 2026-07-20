@@ -46,6 +46,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      # Needed for the cosign dry-run below to mint a Fulcio cert via OIDC.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -91,6 +93,23 @@ jobs:
 
       - name: Package Windows installer
         run: npm run make
+
+      - uses: sigstore/cosign-installer@v3
+
+      # This PR build never becomes a real release, so there's nothing to
+      # attach this to — it exists purely to prove the keyless sign/verify
+      # invocation used in release.yml actually works against a real
+      # installer file before that (CI-unverifiable) step ever runs for
+      # real. See release.yml for the step that matters.
+      - name: Cosign sign/verify dry run
+        shell: bash
+        run: |
+          EXE_PATH=$(find dist -maxdepth 1 -name '*.exe' | head -1)
+          cosign sign-blob --yes --bundle "$EXE_PATH.cosign.bundle" "$EXE_PATH"
+          cosign verify-blob --bundle "$EXE_PATH.cosign.bundle" \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$EXE_PATH"
 
       # Only meaningful for PR builds with a predicted release — plain
       # pushes to master (already merged, not previewing anything) and
