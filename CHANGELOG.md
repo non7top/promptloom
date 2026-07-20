@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.1](https://github.com/non7top/promptloom/compare/v2.0.0...v2.0.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **release:** backfill dispatch should build from current code, not the tag ([0beafb6](https://github.com/non7top/promptloom/commit/0beafb623b876851c958fe1624d12f594eff9ee3))
+* **release:** backfill dispatch should build from current code, not the tag ([991178f](https://github.com/non7top/promptloom/commit/991178f535ca4a223d9ff695c5294d61fff5967b))
+* **release:** match electron-builder's releaseType to release-please's existing release ([9ba1994](https://github.com/non7top/promptloom/commit/9ba19943fcbcad2a92d5503072adb0c73609902c))
+* **release:** match electron-builder's releaseType to release-please's existing release ([1008532](https://github.com/non7top/promptloom/commit/10085329a994ca8d52dded711f520ab08d96cc4b))
+
 ## [2.0.0](https://github.com/non7top/promptloom/compare/v1.4.0...v2.0.0) (2026-07-20)
 
 
