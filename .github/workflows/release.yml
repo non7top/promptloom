@@ -35,7 +35,12 @@ jobs:
         id: find_tag
         shell: bash
         run: |
-          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          # grep exits 1 when no tag matches (the normal case for a non-
+          # release merge) — under this step's `-e -o pipefail` shell, that
+          # would otherwise fail the whole step instead of just yielding an
+          # empty $TAG, which is the expected, already-handled case (see the
+          # `release` job's `if: needs.check-release-tag.outputs.tag != ''`).
+          TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   release:
