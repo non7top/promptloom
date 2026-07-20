@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.0.0](https://github.com/non7top/promptloom/compare/v1.4.0...v2.0.0) (2026-07-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* migrate off @electron-forge/plugin-vite to electron-vite + electron-builder
+
+### Features
+
+* add pre-commit config with eslint hook ([228a495](https://github.com/non7top/promptloom/commit/228a495a6f69e11e34114a19f73ec74f78141395))
+* add pre-commit config with eslint hook ([74fd389](https://github.com/non7top/promptloom/commit/74fd389aab428eaf6f7ccb0172bdc530a11295fc)), closes [#30](https://github.com/non7top/promptloom/issues/30)
+* **ci:** color-code the RELEASE label by predicted bump type ([9d5555e](https://github.com/non7top/promptloom/commit/9d5555ed38b93561ea32e8b70050bece1c117b65))
+* **ci:** color-code the RELEASE label by predicted bump type ([d5630e1](https://github.com/non7top/promptloom/commit/d5630e1ada630bd8c657863c0e4e62141fe70762)), closes [#46](https://github.com/non7top/promptloom/issues/46)
+* migrate off @electron-forge/plugin-vite to electron-vite + electron-builder ([b71e7cb](https://github.com/non7top/promptloom/commit/b71e7cb07ab5e43a62dcb277387e1415808ee8a7)), closes [#56](https://github.com/non7top/promptloom/issues/56)
+* **release:** sign release artifacts with cosign (keyless) ([b5bdadb](https://github.com/non7top/promptloom/commit/b5bdadba9a2efe799111964be131655dc878dae6))
+* **release:** sign release artifacts with cosign (keyless) ([e6a1e0f](https://github.com/non7top/promptloom/commit/e6a1e0fde16a3ce93ffc2eb28e27cab6909d37b4))
+
+
+### Bug Fixes
+
+* **afterpack:** dynamically import @electron/fuses for ESM-only 2.x ([5438915](https://github.com/non7top/promptloom/commit/54389155f7095aa83189913ca2fa66960deb55c5))
+* **afterpack:** dynamically import @electron/fuses for ESM-only 2.x ([e5d8d12](https://github.com/non7top/promptloom/commit/e5d8d124c046bcd995f8a7f1ba91b8e95e7f49c0))
+* **ci:** don't fail the Release workflow when a merge isn't a release ([33b4ac5](https://github.com/non7top/promptloom/commit/33b4ac5438ed6b0acbe504652dd547c41133a91f))
+* **ci:** don't fail the Release workflow when a merge isn't a release ([16c46a1](https://github.com/non7top/promptloom/commit/16c46a130265f5ee418251201a5bfd8f181d863d)), closes [#57](https://github.com/non7top/promptloom/issues/57)
+
 ## [1.4.0](https://github.com/non7top/promptloom/compare/v1.3.0...v1.4.0) (2026-07-19)
 
 
