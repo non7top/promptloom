@@ -33,10 +33,13 @@ jobs:
           # workflow_run doesn't check out the commit that triggered it by
           # default — it checks out the default branch's current tip, which
           # may have moved on since. Pin to the exact commit release-please
-          # just processed (or, for a manual backfill, the given tag), and
-          # fetch tags explicitly since fetch-depth: 0 alone doesn't
-          # guarantee it.
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.workflow_run.head_sha }}
+          # just processed. For a manual backfill (workflow_dispatch),
+          # deliberately do NOT check out the given tag itself — the whole
+          # point of a backfill is to rebuild with whatever release-process
+          # fix just landed on the dispatch ref (normally master), not to
+          # reproduce the original (possibly buggy) build verbatim. `tag`
+          # is only used below to know which existing tag/version this is.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -68,7 +71,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.check-release-tag.outputs.tag }}
+          # Same reasoning as check-release-tag's checkout above: build from
+          # the dispatch ref (current code) on a manual backfill, not from
+          # the tag itself, so a release-process fix actually takes effect
+          # instead of reproducing the original build byte-for-byte.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
       - uses: actions/setup-node@v7
         with:
