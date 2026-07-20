@@ -34,6 +34,11 @@ outputs:
   would-release:
     description: Whether merging this PR would trigger a release ("true"/"false").
     value: ${{ steps.extract.outputs.would_release }}
+  bump-type:
+    description: >-
+      Predicted bump type ("major"/"minor"/"patch") if this PR were merged
+      right now, or empty if there are no releasable changes.
+    value: ${{ steps.extract.outputs.bump_type }}
 
 runs:
   using: composite
@@ -108,6 +113,26 @@ runs:
         fi
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
+        # Diff the last released version (read from the manifest on the
+        # base branch, before this PR's own changes) against the predicted
+        # version above to classify the bump. release-please's dry-run
+        # text doesn't state this directly, so we derive it from the two
+        # numbers rather than trying to re-parse commit types ourselves.
+        bump_type=""
+        if [ "$would_release" = true ]; then
+          current_version=$(git show preview-base:.release-please-manifest.json | jq -r '."."')
+          IFS='.' read -r cur_major cur_minor _ <<< "$current_version"
+          IFS='.' read -r new_major new_minor _ <<< "$version"
+          if [ "$new_major" -gt "$cur_major" ]; then
+            bump_type=major
+          elif [ "$new_minor" -gt "$cur_minor" ]; then
+            bump_type=minor
+          else
+            bump_type=patch
+          fi
+        fi
+        echo "bump_type=$bump_type" >> "$GITHUB_OUTPUT"
+
         # The `body:` field is the exact markdown release-please would put
         # in the real release PR/GitHub release — already valid Markdown
         # (headings, links, bold), not a code block to be displayed
@@ -158,6 +183,15 @@ runs:
         } > comment-body.md
         gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file comment-body.md
 
+    # A label's color is a repo-wide property of the label itself, not a
+    # per-application snapshot — recoloring it here changes how it displays
+    # on every open PR currently wearing it, not just this one. That's fine
+    # in practice since this repo normally only has one release-triggering
+    # PR (or release-please's own release PR) open at a time. Keep this
+    # color scheme in sync with release-please.yml's copy so RELEASE means
+    # the same thing everywhere it shows up: green (patch) is the routine,
+    # expected case; yellow (minor) is new-but-compatible; red (major) is
+    # the one worth a second look before merging.
     - name: Label PR if it would trigger a release
       if: inputs.post-comment == 'true'
       shell: bash
@@ -166,6 +200,13 @@ runs:
       run: |
         gh label create RELEASE --color FF0000 --force --repo "${{ github.repository }}"
         if [ "${{ steps.extract.outputs.would_release }}" = true ]; then
+          case "${{ steps.extract.outputs.bump_type }}" in
+            major) color=D93F0B ;;
+            minor) color=FBCA04 ;;
+            patch) color=0E8A16 ;;
+            *) color=FF0000 ;;
+          esac
+          gh label edit RELEASE --color "$color" --repo "${{ github.repository }}"
           gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --add-label RELEASE
         else
           gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --remove-label RELEASE || true
