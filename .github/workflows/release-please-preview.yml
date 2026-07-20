@@ -24,6 +24,6 @@ jobs:
         with:
           node-version: 22
 
-      - uses: ./.github/actions/predict-next-version
+      - uses: non7top/predict-next-version-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
