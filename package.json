@@ -8,8 +8,8 @@
   "scripts": {
     "start": "electron-vite dev",
     "build": "electron-vite build",
-    "package": "electron-vite build && electron-builder --dir",
-    "make": "electron-vite build && electron-builder",
+    "package": "electron-vite build && electron-builder --dir --publish never",
+    "make": "electron-vite build && electron-builder --publish never",
     "publish": "electron-vite build && electron-builder --publish always",
     "lint": "biome lint ."
   },
