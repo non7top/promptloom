@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0](https://github.com/non7top/promptloom/compare/v3.0.0...v4.0.0) (2026-07-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* bump to electron-vite 6 beta, vite 8, plugin-react 6; drop the last dependabot ignores
+
+### Features
+
+* bump to electron-vite 6 beta, vite 8, plugin-react 6; drop the last dependabot ignores ([1075200](https://github.com/non7top/promptloom/commit/1075200ff1fd6c784f849c04e48542e9927e4e22))
+
 ## [3.0.0](https://github.com/non7top/promptloom/compare/v2.0.1...v3.0.0) (2026-07-20)
 
 

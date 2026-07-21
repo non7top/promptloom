@@ -1,7 +1,7 @@
 {
   "name": "promptloom",
   "productName": "PromptLoom",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "A companion app for keeping track of prompt/seed combinations while working on sprites for visual novels, using perchance.org's AI text-to-image generator. Not intended to bypass any restrictions of the platform or otherwise abuse it.",
   "main": "out/main/index.js",
   "private": true,
