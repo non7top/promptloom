@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.0.1](https://github.com/non7top/promptloom/compare/v4.0.0...v4.0.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* **ci:** stop electron-builder's implicit publish attempt on plain pushes ([eb433f2](https://github.com/non7top/promptloom/commit/eb433f202c7dbde51817f5e0ecc374bf90f8c045))
+* **ci:** stop electron-builder's implicit publish attempt on plain pushes ([50901b3](https://github.com/non7top/promptloom/commit/50901b3d9dc3c6e700dc773601c26c71032719a4))
+
 ## [4.0.0](https://github.com/non7top/promptloom/compare/v3.0.0...v4.0.0) (2026-07-21)
 
 
