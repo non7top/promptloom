@@ -12,17 +12,6 @@ updates:
     commit-message:
       prefix: "chore"
       prefix-development: "chore"
-    ignore:
-      # electron-vite@5.0.0 (our build tool, replacing @electron-forge/
-      # plugin-vite) peer-pins vite to ^5 || ^6 || ^7 — a vite 8 bump breaks
-      # the build until electron-vite ships support for it.
-      - dependency-name: "vite"
-        update-types: ["version-update:semver-major"]
-      # @vitejs/plugin-react@^4.7.0 already supports vite up through ^7; its
-      # own next major (6.x) requires vite@^8, which we can't take yet per
-      # the vite ignore above — bumping this alone would force that.
-      - dependency-name: "@vitejs/plugin-react"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

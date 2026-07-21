@@ -93,6 +93,31 @@ because forge's Vite integration is explicitly non-production per its own
 maintainers (electron/forge#4067) and pinned to vite@^5 with no updated
 release in sight.
 
+### Build tooling — known hurdles
+
+This corner of the stack has been unusually high-friction; recorded here so
+it isn't rediscovered the hard way again:
+
+- **electron-forge's Vite plugin was a dead end**, not just slow — its own
+  maintainers flag it non-production (electron/forge#4067), permanently
+  pinned to `vite@^5`. This is why the whole build/package/publish pipeline
+  was replaced with electron-vite + electron-builder (#56).
+- **electron-builder defaults to publishing *draft* releases** and silently
+  skips uploading *every* asset (installer, blockmap, update feed) if a
+  release of a different type already exists for that tag — no error, just
+  a quiet log line. release-please always creates a normal (non-draft)
+  release before this workflow runs, so the very first release cut on the
+  new pipeline (v2.0.0) shipped with nothing but a cosign signature
+  attached to an otherwise-empty release. Fixed by pinning
+  `publish.releaseType: release` in `electron-builder.yml` (#70), plus a
+  `workflow_dispatch` escape hatch in `release.yml` to backfill a release
+  without waiting for a new version bump (#70, #72).
+- **electron-vite is currently pinned to a beta** (`6.0.0-beta.1`) purely to
+  get `vite@^8` support — the last stable release (`5.0.0`) caps at
+  `vite@^7`. This is a deliberate, tracked trade-off (no dependabot ignore
+  needed on `vite`/`@vitejs/plugin-react` as a result) — watch for
+  electron-vite 6 going stable and re-pin to that once it lands.
+
 ## Packaging
 
 ```sh
