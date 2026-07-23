@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.2](https://github.com/non7top/promptloom/compare/v4.0.1...v4.0.2) (2026-07-23)
+
+
+### Bug Fixes
+
+* bump fast-uri from 3.1.3 to 3.1.4 ([93d1f0c](https://github.com/non7top/promptloom/commit/93d1f0c0a2b3008ce7e540aafdbeee4b00f9273c))
+
 ## [4.0.1](https://github.com/non7top/promptloom/compare/v4.0.0...v4.0.1) (2026-07-21)
 
 
