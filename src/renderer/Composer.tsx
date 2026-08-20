@@ -88,7 +88,7 @@ export default function Composer({ categories, items, onStashChange }: Props) {
   };
 
   const start = async () => {
-    const name = stashName.trim() || `Stash ${new Date().toLocaleString()}`;
+    const name = stashName.trim() || new Date().toISOString().slice(0, 10);
     setStashName(name);
     await window.promptloom.setCurrentStash(name);
     onStashChange?.(name);

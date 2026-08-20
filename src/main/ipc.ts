@@ -5,7 +5,10 @@ import * as db from './db';
 import { populatePrompt } from './perchanceDriver';
 import { getLastPerchanceStatus, setPerchanceViewHidden } from './perchanceView';
 
-let currentStash = 'Unsorted';
+// Whatever a perchance-side save lands in before Composer's own start()
+// ever sets a real stash name — today's date rather than a generic bucket,
+// same fallback Composer.tsx uses when its own name field is left blank.
+let currentStash = new Date().toISOString().slice(0, 10);
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('categories:list', () => db.listCategories());
