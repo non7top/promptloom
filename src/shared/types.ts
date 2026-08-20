@@ -16,6 +16,16 @@ export interface DefinitionsImportResult {
   itemsUpdated: number;
 }
 
+export interface GalleryExportResult {
+  filePath: string;
+  count: number;
+}
+
+export interface GalleryImportResult {
+  imported: number;
+  skipped: number;
+}
+
 export interface Generation {
   id: number;
   batchLabel: string;
@@ -58,6 +68,8 @@ export interface PromptLoomApi {
   deleteBatch(batchLabel: string): Promise<void>;
   renameBatch(oldLabel: string, newLabel: string): Promise<void>;
   saveGenerationAs(id: number): Promise<string | null>;
+  exportGallery(): Promise<GalleryExportResult | null>;
+  importGallery(): Promise<GalleryImportResult | null>;
 
   populatePrompt(promptText: string): Promise<void>;
   getCurrentStash(): Promise<string>;

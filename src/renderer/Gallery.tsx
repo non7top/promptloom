@@ -37,6 +37,8 @@ export default function Gallery() {
   const [renameValue, setRenameValue] = useState('');
   const [justSavedId, setJustSavedId] = useState<number | null>(null);
   const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
+  const galleryStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -109,6 +111,30 @@ export default function Gallery() {
     await window.promptloom.saveGenerationAs(id);
   };
 
+  const showGalleryStatus = (message: string) => {
+    setGalleryStatus(message);
+    if (galleryStatusTimer.current) clearTimeout(galleryStatusTimer.current);
+    galleryStatusTimer.current = setTimeout(() => setGalleryStatus(null), 6_000);
+  };
+
+  const exportGallery = async () => {
+    const result = await window.promptloom.exportGallery();
+    if (!result) return;
+    showGalleryStatus(
+      `Exported ${result.count} image${result.count === 1 ? '' : 's'} to ${result.filePath}`,
+    );
+  };
+
+  const importGallery = async () => {
+    const result = await window.promptloom.importGallery();
+    if (!result) return;
+    showGalleryStatus(
+      `Imported ${result.imported} image${result.imported === 1 ? '' : 's'}` +
+        (result.skipped ? ` (${result.skipped} skipped — no image found)` : ''),
+    );
+    reload();
+  };
+
   const removeGroup = async (label: string) => {
     await window.promptloom.deleteBatch(label);
     setConfirmingLabel(null);
@@ -141,12 +167,16 @@ export default function Gallery() {
     });
   };
 
-  if (generations.length === 0) {
-    return <p className="hint">No generations captured yet.</p>;
-  }
-
   return (
     <div>
+      <div className="gallery-toolbar">
+        <button onClick={exportGallery} disabled={generations.length === 0}>
+          Export gallery (.zip)
+        </button>
+        <button onClick={importGallery}>Import gallery (.zip)</button>
+        {galleryStatus && <span className="hint">{galleryStatus}</span>}
+      </div>
+      {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
       {groupByLabel(generations).map(([label, group]) => (
         <details
           className="category"

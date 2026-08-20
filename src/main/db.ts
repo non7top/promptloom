@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Category, Item, Generation } from '../shared/types';
+import AdmZip from 'adm-zip';
+import type { Category, Item, Generation, GalleryImportResult } from '../shared/types';
 
 let db: DatabaseSync;
 let imagesDir: string;
@@ -201,13 +202,36 @@ export function listGenerations(): Generation[] {
   }));
 }
 
-// A companion .txt file next to each image, so the prompt and seed stay
-// readable/portable straight from the stash folder on disk, not just the
-// app's own database.
-export function sidecarText(promptText: string, seed: string | null): string {
+// A companion .txt file next to each image, so the prompt/seed/creation
+// time stay readable/portable straight from the stash folder on disk, not
+// just the app's own database. createdAt is what lets importGalleryZip
+// reconstruct the original ordering (see there) rather than falling back
+// to a zip's own (alphabetical-by-filename) entry order.
+export function sidecarText(promptText: string, seed: string | null, createdAt: string): string {
   // perchance's own syntax for forcing a specific seed when the prompt text
   // is pasted back in, so a sidecar file is enough to reproduce a result.
-  return `Prompt: ${promptText}\nSeed: ${seed ? `(seed:::${seed})` : 'unknown'}\n`;
+  return `Prompt: ${promptText}\nSeed: ${seed ? `(seed:::${seed})` : 'unknown'}\nCreated: ${createdAt}\n`;
+}
+
+// Random names, not sequential IDs — a stash folder can end up with
+// millions of these, and there's no reason to expose (or rely on) the DB's
+// row order in the filename. Shared by saveGeneration (renderer capture, a
+// data URL) and importGalleryZip (a zip entry, already raw bytes).
+function writeGenerationFiles(
+  promptText: string,
+  seed: string | null,
+  createdAt: string,
+  imageBytes: Buffer,
+  ext: string,
+): string {
+  const baseName = randomUUID();
+  const imagePath = path.join(imagesDir, `${baseName}.${ext}`);
+  fs.writeFileSync(imagePath, imageBytes);
+  fs.writeFileSync(
+    path.join(imagesDir, `${baseName}.txt`),
+    sidecarText(promptText, seed, createdAt),
+  );
+  return imagePath;
 }
 
 export function saveGeneration(
@@ -225,14 +249,14 @@ export function saveGeneration(
     .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
   const id = Number(lastInsertRowid);
 
-  // Random names, not sequential IDs — a stash folder can end up with
-  // millions of these, and there's no reason to expose (or rely on) the
-  // DB's row order in the filename.
-  const baseName = randomUUID();
-  const imagePath = path.join(imagesDir, `${baseName}.png`);
   const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-  fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'));
-  fs.writeFileSync(path.join(imagesDir, `${baseName}.txt`), sidecarText(promptText, seed));
+  const imagePath = writeGenerationFiles(
+    promptText,
+    seed,
+    createdAt,
+    Buffer.from(base64, 'base64'),
+    'png',
+  );
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
 
   return {
@@ -245,6 +269,158 @@ export function saveGeneration(
     imageUrl: pathToFileURL(imagePath).href,
     createdAt,
   };
+}
+
+// A stash label can contain characters that aren't safe as a zip/filesystem
+// folder name (e.g. someone pastes a prompt fragment as the stash name) —
+// sanitize for the folder, but keep the original label as the DB value
+// (round-tripped separately, not derived from the sanitized folder name).
+function sanitizeFolderName(label: string): string {
+  const cleaned = label.replace(/[\\/:*?"<>|]/g, '_').trim();
+  return cleaned || 'Unsorted';
+}
+
+// Exported structure is deliberately just folders-of-(image, sidecar .txt)
+// — the same pairing already used in imagesDir — rather than a manifest
+// format of our own: it's directly browsable (open the zip, view the PNGs,
+// read the prompt/seed next to each one) and re-importable using only that
+// pairing, no app-specific format to parse.
+export function exportGalleryZip(destPath: string): number {
+  const zip = new AdmZip();
+  let count = 0;
+  for (const generation of listGenerations()) {
+    if (!fs.existsSync(generation.imagePath)) continue;
+    const folder = sanitizeFolderName(generation.batchLabel);
+    const base = path.basename(generation.imagePath, path.extname(generation.imagePath));
+    const ext = path.extname(generation.imagePath).slice(1) || 'png';
+    zip.addFile(`${folder}/${base}.${ext}`, fs.readFileSync(generation.imagePath));
+    zip.addFile(
+      `${folder}/${base}.txt`,
+      Buffer.from(sidecarText(generation.promptText, generation.seed, generation.createdAt), 'utf-8'),
+    );
+    count += 1;
+  }
+  zip.writeZip(destPath);
+  return count;
+}
+
+function parseSeedPart(seedPart: string): string | null {
+  const seedMatch = /^\(seed:::(.*)\)$/.exec(seedPart.trim());
+  return seedMatch ? seedMatch[1] : null;
+}
+
+// Inverse of sidecarText() — tolerant of the prompt itself spanning
+// multiple lines (it usually does), since the greedy match only backs off
+// as far as the final "\nSeed: ...\nCreated: " lines, wherever those
+// actually fall. Also tolerant of a sidecar exported before the "Created:"
+// line existed — createdAt comes back null rather than failing to parse.
+function parseSidecarText(text: string): {
+  promptText: string;
+  seed: string | null;
+  createdAt: string | null;
+} {
+  const withCreated = /^Prompt: ([\s\S]*)\nSeed: (.*)\nCreated: (.*?)\s*$/.exec(text);
+  if (withCreated) {
+    const [, promptText, seedPart, createdAt] = withCreated;
+    return { promptText, seed: parseSeedPart(seedPart), createdAt };
+  }
+  const withoutCreated = /^Prompt: ([\s\S]*)\nSeed: (.*?)\s*$/.exec(text);
+  if (withoutCreated) {
+    const [, promptText, seedPart] = withoutCreated;
+    return { promptText, seed: parseSeedPart(seedPart), createdAt: null };
+  }
+  return { promptText: text.trim(), seed: null, createdAt: null };
+}
+
+const IMPORT_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
+
+// Folder name becomes the batch label verbatim (whatever was exported, or
+// whatever a human named the folder by hand) — every image/sidecar pair
+// inside it imports as one generation. A bare image with no matching .txt
+// still imports fine (just with an empty prompt and no seed), so a folder
+// of plain images dropped in by hand is valid input too, not just our own
+// export output.
+interface PendingImport {
+  batchLabel: string;
+  image: AdmZip.IZipEntry;
+  promptText: string;
+  seed: string | null;
+  createdAt: string | null;
+}
+
+export function importGalleryZip(zipPath: string): GalleryImportResult {
+  // Deliberately NOT relying on the order zip.getEntries() returns things
+  // in: adm-zip re-sorts entries alphabetically by filename on read (its
+  // own default, not something we opted into), and our filenames are
+  // random UUIDs, so that order has nothing to do with creation order.
+  // Every pending item's real createdAt (from its sidecar) is collected
+  // first, then everything is sorted by that before any DB insert — insert
+  // order is what fixes each row's auto-increment id, which is what
+  // listGenerations()'s `ORDER BY id DESC` actually displays by.
+  const zip = new AdmZip(zipPath);
+  const byFolder = new Map<string, AdmZip.IZipEntry[]>();
+
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue;
+    const parts = entry.entryName.split('/').filter(Boolean);
+    if (parts.length < 2) continue; // loose file at the zip root, not inside a stash folder
+    const list = byFolder.get(parts[0]) ?? [];
+    list.push(entry);
+    byFolder.set(parts[0], list);
+  }
+
+  const pending: PendingImport[] = [];
+  let skipped = 0;
+
+  for (const [batchLabel, entries] of byFolder) {
+    const byBase = new Map<string, { image?: AdmZip.IZipEntry; sidecar?: AdmZip.IZipEntry }>();
+    for (const entry of entries) {
+      const name = entry.entryName.split('/').pop() as string;
+      const isImage = IMPORT_IMAGE_EXT.test(name);
+      const isSidecar = /\.txt$/i.test(name);
+      if (!isImage && !isSidecar) continue;
+      const base = name.replace(/\.(png|jpe?g|webp|gif|txt)$/i, '');
+      const record = byBase.get(base) ?? {};
+      if (isImage) record.image = entry;
+      if (isSidecar) record.sidecar = entry;
+      byBase.set(base, record);
+    }
+
+    for (const { image, sidecar } of byBase.values()) {
+      if (!image) {
+        skipped += 1;
+        continue;
+      }
+      const { promptText, seed, createdAt } = sidecar
+        ? parseSidecarText(sidecar.getData().toString('utf-8'))
+        : { promptText: '', seed: null, createdAt: null };
+      pending.push({ batchLabel, image, promptText, seed, createdAt });
+    }
+  }
+
+  // Unknown createdAt (no sidecar, or one from before this field existed)
+  // sorts first — there's no way to know its real position, and it's no
+  // worse than the alphabetical-by-UUID order this replaces.
+  pending.sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+
+  let imported = 0;
+  for (const item of pending) {
+    const ext = IMPORT_IMAGE_EXT.exec(item.image.entryName)?.[1].toLowerCase() ?? 'png';
+    const createdAt = item.createdAt ?? new Date().toISOString();
+    const imagePath = writeGenerationFiles(
+      item.promptText,
+      item.seed,
+      createdAt,
+      item.image.getData(),
+      ext,
+    );
+    db.prepare(
+      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(item.batchLabel, item.promptText, JSON.stringify({}), item.seed, imagePath, createdAt);
+    imported += 1;
+  }
+
+  return { imported, skipped };
 }
 
 export function getGeneration(id: number): Generation | null {
