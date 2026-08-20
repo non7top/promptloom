@@ -94,7 +94,10 @@ export function registerIpcHandlers(): void {
 
     fs.copyFileSync(generation.imagePath, filePath);
     const txtPath = filePath.replace(/\.png$/i, '') + '.txt';
-    fs.writeFileSync(txtPath, db.sidecarText(generation.promptText, generation.seed));
+    fs.writeFileSync(
+      txtPath,
+      db.sidecarText(generation.promptText, generation.seed, generation.createdAt),
+    );
     return filePath;
   });
 
