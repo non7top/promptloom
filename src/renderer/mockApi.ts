@@ -127,6 +127,8 @@ export const mockApi: PromptLoomApi = {
     }
   },
   saveGenerationAs: async () => null,
+  exportGallery: async () => ({ filePath: '/tmp/promptloom-gallery-demo.zip', count: generations.length }),
+  importGallery: async () => null,
 
   populatePrompt: async () => undefined,
   getCurrentStash: async () => currentStash,

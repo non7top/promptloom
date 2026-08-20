@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Category, Item, Generation } from '../shared/types';
+import AdmZip from 'adm-zip';
+import type { Category, Item, Generation, GalleryImportResult } from '../shared/types';
 
 let db: DatabaseSync;
 let imagesDir: string;
@@ -210,6 +211,23 @@ export function sidecarText(promptText: string, seed: string | null): string {
   return `Prompt: ${promptText}\nSeed: ${seed ? `(seed:::${seed})` : 'unknown'}\n`;
 }
 
+// Random names, not sequential IDs — a stash folder can end up with
+// millions of these, and there's no reason to expose (or rely on) the DB's
+// row order in the filename. Shared by saveGeneration (renderer capture, a
+// data URL) and importGalleryZip (a zip entry, already raw bytes).
+function writeGenerationFiles(
+  promptText: string,
+  seed: string | null,
+  imageBytes: Buffer,
+  ext: string,
+): string {
+  const baseName = randomUUID();
+  const imagePath = path.join(imagesDir, `${baseName}.${ext}`);
+  fs.writeFileSync(imagePath, imageBytes);
+  fs.writeFileSync(path.join(imagesDir, `${baseName}.txt`), sidecarText(promptText, seed));
+  return imagePath;
+}
+
 export function saveGeneration(
   batchLabel: string,
   promptText: string,
@@ -225,14 +243,8 @@ export function saveGeneration(
     .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
   const id = Number(lastInsertRowid);
 
-  // Random names, not sequential IDs — a stash folder can end up with
-  // millions of these, and there's no reason to expose (or rely on) the
-  // DB's row order in the filename.
-  const baseName = randomUUID();
-  const imagePath = path.join(imagesDir, `${baseName}.png`);
   const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-  fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'));
-  fs.writeFileSync(path.join(imagesDir, `${baseName}.txt`), sidecarText(promptText, seed));
+  const imagePath = writeGenerationFiles(promptText, seed, Buffer.from(base64, 'base64'), 'png');
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
 
   return {
@@ -245,6 +257,109 @@ export function saveGeneration(
     imageUrl: pathToFileURL(imagePath).href,
     createdAt,
   };
+}
+
+// A stash label can contain characters that aren't safe as a zip/filesystem
+// folder name (e.g. someone pastes a prompt fragment as the stash name) —
+// sanitize for the folder, but keep the original label as the DB value
+// (round-tripped separately, not derived from the sanitized folder name).
+function sanitizeFolderName(label: string): string {
+  const cleaned = label.replace(/[\\/:*?"<>|]/g, '_').trim();
+  return cleaned || 'Unsorted';
+}
+
+// Exported structure is deliberately just folders-of-(image, sidecar .txt)
+// — the same pairing already used in imagesDir — rather than a manifest
+// format of our own: it's directly browsable (open the zip, view the PNGs,
+// read the prompt/seed next to each one) and re-importable using only that
+// pairing, no app-specific format to parse.
+export function exportGalleryZip(destPath: string): number {
+  const zip = new AdmZip();
+  let count = 0;
+  for (const generation of listGenerations()) {
+    if (!fs.existsSync(generation.imagePath)) continue;
+    const folder = sanitizeFolderName(generation.batchLabel);
+    const base = path.basename(generation.imagePath, path.extname(generation.imagePath));
+    const ext = path.extname(generation.imagePath).slice(1) || 'png';
+    zip.addFile(`${folder}/${base}.${ext}`, fs.readFileSync(generation.imagePath));
+    zip.addFile(
+      `${folder}/${base}.txt`,
+      Buffer.from(sidecarText(generation.promptText, generation.seed), 'utf-8'),
+    );
+    count += 1;
+  }
+  zip.writeZip(destPath);
+  return count;
+}
+
+// Inverse of sidecarText() — tolerant of the prompt itself spanning
+// multiple lines (it usually does), since the greedy match only backs off
+// as far as the final "\nSeed: " line, wherever that actually falls.
+function parseSidecarText(text: string): { promptText: string; seed: string | null } {
+  const match = /^Prompt: ([\s\S]*)\nSeed: (.*?)\s*$/.exec(text);
+  if (!match) return { promptText: text.trim(), seed: null };
+  const [, promptText, seedPart] = match;
+  const seedMatch = /^\(seed:::(.*)\)$/.exec(seedPart.trim());
+  return { promptText, seed: seedMatch ? seedMatch[1] : null };
+}
+
+const IMPORT_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
+
+// Folder name becomes the batch label verbatim (whatever was exported, or
+// whatever a human named the folder by hand) — every image/sidecar pair
+// inside it imports as one generation. A bare image with no matching .txt
+// still imports fine (just with an empty prompt and no seed), so a folder
+// of plain images dropped in by hand is valid input too, not just our own
+// export output.
+export function importGalleryZip(zipPath: string): GalleryImportResult {
+  const zip = new AdmZip(zipPath);
+  const byFolder = new Map<string, AdmZip.IZipEntry[]>();
+
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue;
+    const parts = entry.entryName.split('/').filter(Boolean);
+    if (parts.length < 2) continue; // loose file at the zip root, not inside a stash folder
+    const list = byFolder.get(parts[0]) ?? [];
+    list.push(entry);
+    byFolder.set(parts[0], list);
+  }
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const [batchLabel, entries] of byFolder) {
+    const byBase = new Map<string, { image?: AdmZip.IZipEntry; sidecar?: AdmZip.IZipEntry }>();
+    for (const entry of entries) {
+      const name = entry.entryName.split('/').pop() as string;
+      const isImage = IMPORT_IMAGE_EXT.test(name);
+      const isSidecar = /\.txt$/i.test(name);
+      if (!isImage && !isSidecar) continue;
+      const base = name.replace(/\.(png|jpe?g|webp|gif|txt)$/i, '');
+      const record = byBase.get(base) ?? {};
+      if (isImage) record.image = entry;
+      if (isSidecar) record.sidecar = entry;
+      byBase.set(base, record);
+    }
+
+    for (const { image, sidecar } of byBase.values()) {
+      if (!image) {
+        skipped += 1;
+        continue;
+      }
+      const ext = IMPORT_IMAGE_EXT.exec(image.entryName)?.[1].toLowerCase() ?? 'png';
+      const { promptText, seed } = sidecar
+        ? parseSidecarText(sidecar.getData().toString('utf-8'))
+        : { promptText: '', seed: null };
+      const imagePath = writeGenerationFiles(promptText, seed, image.getData(), ext);
+      const createdAt = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      ).run(batchLabel, promptText, JSON.stringify({}), seed, imagePath, createdAt);
+      imported += 1;
+    }
+  }
+
+  return { imported, skipped };
 }
 
 export function getGeneration(id: number): Generation | null {

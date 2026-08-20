@@ -24,6 +24,8 @@ const api: PromptLoomApi = {
   renameBatch: (oldLabel, newLabel) =>
     ipcRenderer.invoke('generations:renameBatch', oldLabel, newLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
+  exportGallery: () => ipcRenderer.invoke('gallery:export'),
+  importGallery: () => ipcRenderer.invoke('gallery:import'),
 
   populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
   getCurrentStash: () => ipcRenderer.invoke('stash:getCurrent'),
