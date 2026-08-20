@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.1.0](https://github.com/non7top/promptloom/compare/v4.0.2...v4.1.0) (2026-08-20)
+
+
+### Features
+
+* **gallery:** copy prompt includes seed; seed button loads it into perchance ([acb71f3](https://github.com/non7top/promptloom/commit/acb71f31781b04266c449151f65570771a63dd26))
+* **gallery:** export/import the gallery as a zip ([6caacd3](https://github.com/non7top/promptloom/commit/6caacd3467b9671084d6e2b109f52cd7a9ad9f9f))
+
+
+### Bug Fixes
+
+* **build:** stop electron-vite from silently externalizing main/preload deps ([c1c5fcd](https://github.com/non7top/promptloom/commit/c1c5fcd135b04dd04615f3bded9a4744adf026d6))
+* **gallery:** default new stashes to today's date, not a generic name ([55abb9a](https://github.com/non7top/promptloom/commit/55abb9ae0b9d19da6a7e705303c372dd63e9413d))
+* **gallery:** preserve creation order across export/import ([12db3e9](https://github.com/non7top/promptloom/commit/12db3e9948f75fe0ef87e5f6a7a30adbc5048eb6))
+
 ## [4.0.2](https://github.com/non7top/promptloom/compare/v4.0.1...v4.0.2) (2026-07-23)
 
 
