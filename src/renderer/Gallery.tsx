@@ -280,20 +280,15 @@ export default function Gallery() {
                     <button className="btn-save" onClick={() => saveAs(generation.id)}>
                       Save as...
                     </button>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(generation.promptText)}
-                    >
+                    <button onClick={() => navigator.clipboard.writeText(fullText)}>
                       Copy prompt
                     </button>
                     <button
                       className="btn-icon"
                       disabled={!generation.seed}
-                      title="Copy seed"
-                      aria-label="Copy seed"
-                      onClick={() =>
-                        generation.seed &&
-                        navigator.clipboard.writeText(`(seed:::${generation.seed})`)
-                      }
+                      title="Load into perchance's prompt field"
+                      aria-label="Load into prompt field"
+                      onClick={() => window.promptloom.populatePrompt(fullText)}
                     >
                       🌱
                     </button>
