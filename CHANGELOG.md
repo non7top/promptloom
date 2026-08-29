@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.2.0](https://github.com/non7top/promptloom/compare/v4.1.0...v4.2.0) (2026-08-29)
+
+
+### Features
+
+* **gallery:** move export/import from Gallery buttons to the app menu ([33892f3](https://github.com/non7top/promptloom/commit/33892f314841883cc5001efdd369881120118edd))
+* **gallery:** move export/import from Gallery buttons to the app menu ([09a44ed](https://github.com/non7top/promptloom/commit/09a44edf37067a2cd22cbdf1a96f7d53f8b43e54))
+* **perchance:** replace the Shape dropdown with an always-visible list ([19086ff](https://github.com/non7top/promptloom/commit/19086ff5acfc044891eb16abe78cb5ea1e00086c))
+* **perchance:** replace the Shape dropdown with an always-visible list ([965024b](https://github.com/non7top/promptloom/commit/965024bdf55bdc149061377fccc0c61f6c37eee6))
+* **ui:** keep the tab bar and "Saving to" pinned while scrolling ([c0871fd](https://github.com/non7top/promptloom/commit/c0871fd9b7ef73e1a868791c73ee3b54e4c3e349))
+* **ui:** keep the tab bar and "Saving to" pinned while scrolling ([cacacdb](https://github.com/non7top/promptloom/commit/cacacdb892b6dc1b231db4467553afeb2b4fc881))
+
 ## [4.1.0](https://github.com/non7top/promptloom/compare/v4.0.2...v4.1.0) (2026-08-20)
 
 
