@@ -67,6 +67,25 @@ export default function Gallery() {
     });
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload/showGalleryStatus are redefined every render; this subscribes once and should not re-subscribe every render.
+  useEffect(() => {
+    // Export/Import live in the native app menu (main.ts), not a button
+    // here — there's no direct call to react to, so the result arrives as
+    // a push instead.
+    return window.promptloom.onGalleryAction(({ kind, result }) => {
+      if (!result) return; // dialog was canceled
+      if (kind === 'export') {
+        showGalleryStatus(`Exported ${result.count} image${result.count === 1 ? '' : 's'} to ${result.filePath}`);
+      } else {
+        showGalleryStatus(
+          `Imported ${result.imported} image${result.imported === 1 ? '' : 's'}` +
+            (result.skipped ? ` (${result.skipped} skipped — no image found)` : ''),
+        );
+        reload();
+      }
+    });
+  }, []);
+
   useEffect(() => {
     // Any still-pending timers when the Gallery tab unmounts should still
     // go through with the delete rather than silently getting abandoned.
@@ -117,24 +136,6 @@ export default function Gallery() {
     galleryStatusTimer.current = setTimeout(() => setGalleryStatus(null), 6_000);
   };
 
-  const exportGallery = async () => {
-    const result = await window.promptloom.exportGallery();
-    if (!result) return;
-    showGalleryStatus(
-      `Exported ${result.count} image${result.count === 1 ? '' : 's'} to ${result.filePath}`,
-    );
-  };
-
-  const importGallery = async () => {
-    const result = await window.promptloom.importGallery();
-    if (!result) return;
-    showGalleryStatus(
-      `Imported ${result.imported} image${result.imported === 1 ? '' : 's'}` +
-        (result.skipped ? ` (${result.skipped} skipped — no image found)` : ''),
-    );
-    reload();
-  };
-
   const removeGroup = async (label: string) => {
     await window.promptloom.deleteBatch(label);
     setConfirmingLabel(null);
@@ -169,13 +170,11 @@ export default function Gallery() {
 
   return (
     <div>
-      <div className="gallery-toolbar">
-        <button onClick={exportGallery} disabled={generations.length === 0}>
-          Export gallery (.zip)
-        </button>
-        <button onClick={importGallery}>Import gallery (.zip)</button>
-        {galleryStatus && <span className="hint">{galleryStatus}</span>}
-      </div>
+      {galleryStatus && (
+        <div className="gallery-toolbar">
+          <span className="hint">{galleryStatus}</span>
+        </div>
+      )}
       {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
       {groupByLabel(generations).map(([label, group]) => (
         <details

@@ -4,6 +4,41 @@ import path from 'node:path';
 import * as db from './db';
 import { populatePrompt } from './perchanceDriver';
 import { getLastPerchanceStatus, setPerchanceViewHidden } from './perchanceView';
+import type { GalleryExportResult, GalleryImportResult } from '../shared/types';
+
+// Triggered from the native app menu (main.ts), not a renderer button —
+// exported as plain functions rather than folded into registerIpcHandlers
+// below, since there's no IPC round-trip to wire up for a menu click.
+export async function exportGalleryViaDialog(
+  window: BrowserWindow | null,
+): Promise<GalleryExportResult | null> {
+  const saveOptions = {
+    defaultPath: `promptloom-gallery-${new Date().toISOString().slice(0, 10)}.zip`,
+    filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
+  };
+  const { canceled, filePath } = window
+    ? await dialog.showSaveDialog(window, saveOptions)
+    : await dialog.showSaveDialog(saveOptions);
+  if (canceled || !filePath) return null;
+
+  const count = db.exportGalleryZip(filePath);
+  return { filePath, count };
+}
+
+export async function importGalleryViaDialog(
+  window: BrowserWindow | null,
+): Promise<GalleryImportResult | null> {
+  const openOptions: Electron.OpenDialogOptions = {
+    filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
+    properties: ['openFile'],
+  };
+  const { canceled, filePaths } = window
+    ? await dialog.showOpenDialog(window, openOptions)
+    : await dialog.showOpenDialog(openOptions);
+  if (canceled || filePaths.length === 0) return null;
+
+  return db.importGalleryZip(filePaths[0]);
+}
 
 // Whatever a perchance-side save lands in before Composer's own start()
 // ever sets a real stash name — today's date rather than a generic bucket,
@@ -99,35 +134,6 @@ export function registerIpcHandlers(): void {
       db.sidecarText(generation.promptText, generation.seed, generation.createdAt),
     );
     return filePath;
-  });
-
-  ipcMain.handle('gallery:export', async () => {
-    const saveOptions = {
-      defaultPath: `promptloom-gallery-${new Date().toISOString().slice(0, 10)}.zip`,
-      filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
-    };
-    const window = BrowserWindow.getFocusedWindow();
-    const { canceled, filePath } = window
-      ? await dialog.showSaveDialog(window, saveOptions)
-      : await dialog.showSaveDialog(saveOptions);
-    if (canceled || !filePath) return null;
-
-    const count = db.exportGalleryZip(filePath);
-    return { filePath, count };
-  });
-
-  ipcMain.handle('gallery:import', async () => {
-    const openOptions: Electron.OpenDialogOptions = {
-      filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
-      properties: ['openFile'],
-    };
-    const window = BrowserWindow.getFocusedWindow();
-    const { canceled, filePaths } = window
-      ? await dialog.showOpenDialog(window, openOptions)
-      : await dialog.showOpenDialog(openOptions);
-    if (canceled || filePaths.length === 0) return null;
-
-    return db.importGalleryZip(filePaths[0]);
   });
 
   ipcMain.handle('driver:populatePrompt', (_event, promptText: string) =>

@@ -26,6 +26,14 @@ export interface GalleryImportResult {
   skipped: number;
 }
 
+// Export/import are triggered from the native app menu (main.ts), not a
+// renderer button — there's no request/response call to hand a result
+// back through, so the main process pushes it here instead. `result` is
+// null when the user cancels the save/open dialog.
+export type GalleryActionResult =
+  | { kind: 'export'; result: GalleryExportResult | null }
+  | { kind: 'import'; result: GalleryImportResult | null };
+
 export interface Generation {
   id: number;
   batchLabel: string;
@@ -68,8 +76,6 @@ export interface PromptLoomApi {
   deleteBatch(batchLabel: string): Promise<void>;
   renameBatch(oldLabel: string, newLabel: string): Promise<void>;
   saveGenerationAs(id: number): Promise<string | null>;
-  exportGallery(): Promise<GalleryExportResult | null>;
-  importGallery(): Promise<GalleryImportResult | null>;
 
   populatePrompt(promptText: string): Promise<void>;
   getCurrentStash(): Promise<string>;
@@ -77,4 +83,5 @@ export interface PromptLoomApi {
   setPerchanceHidden(hidden: boolean): Promise<void>;
   onPerchanceStatus(callback: (status: PerchanceStatus) => void): () => void;
   onGenerationSaved(callback: (generation: Generation) => void): () => void;
+  onGalleryAction(callback: (action: GalleryActionResult) => void): () => void;
 }
