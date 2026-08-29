@@ -48,40 +48,49 @@ export default function App() {
 
   return (
     <div>
-      <nav className="tabs">
-        <button
-          className={tab === 'definitions' ? 'active' : ''}
-          onClick={() => setTab('definitions')}
-        >
-          Definitions
-        </button>
-        <button className={tab === 'composer' ? 'active' : ''} onClick={() => setTab('composer')}>
-          Composer
-        </button>
-        <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
-          Gallery
-        </button>
-        <button
-          className="tab-collapse"
-          title={rightPanelCollapsed ? 'Show perchance panel' : 'Collapse right panel'}
-          onClick={() => setRightPanelCollapsed((v) => !v)}
-        >
-          {rightPanelCollapsed ? '⇤' : '⇥'}
-        </button>
-      </nav>
-      {/* Composer sets this automatically when starting a batch, but
-          prompts typed directly into perchance (no Composer run at all)
-          need somewhere to set it manually — always visible, not tied to
-          any one tab, since perchance's own save button can fire from
-          whichever tab happens to be open. */}
-      <div className="active-stash">
-        <label htmlFor="active-stash-input">Saving to</label>
-        <input
-          id="active-stash-input"
-          value={activeStash}
-          onChange={(e) => updateActiveStash(e.target.value)}
-          placeholder="Unsorted"
-        />
+      {/* Sticky as one unit (not each element separately) so both stay
+          pinned to the top of #sidebar's scroll regardless of how tall the
+          active tab's content gets — a long Gallery shouldn't scroll the
+          tabs or "Saving to" out of view. */}
+      <div className="sidebar-header">
+        <nav className="tabs">
+          <button
+            className={tab === 'definitions' ? 'active' : ''}
+            onClick={() => setTab('definitions')}
+          >
+            Definitions
+          </button>
+          <button
+            className={tab === 'composer' ? 'active' : ''}
+            onClick={() => setTab('composer')}
+          >
+            Composer
+          </button>
+          <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
+            Gallery
+          </button>
+          <button
+            className="tab-collapse"
+            title={rightPanelCollapsed ? 'Show perchance panel' : 'Collapse right panel'}
+            onClick={() => setRightPanelCollapsed((v) => !v)}
+          >
+            {rightPanelCollapsed ? '⇤' : '⇥'}
+          </button>
+        </nav>
+        {/* Composer sets this automatically when starting a batch, but
+            prompts typed directly into perchance (no Composer run at all)
+            need somewhere to set it manually — always visible, not tied to
+            any one tab, since perchance's own save button can fire from
+            whichever tab happens to be open. */}
+        <div className="active-stash">
+          <label htmlFor="active-stash-input">Saving to</label>
+          <input
+            id="active-stash-input"
+            value={activeStash}
+            onChange={(e) => updateActiveStash(e.target.value)}
+            placeholder="Unsorted"
+          />
+        </div>
       </div>
       {tab === 'definitions' && (
         <DefinitionManager categories={categories} items={items} onChange={reload} />

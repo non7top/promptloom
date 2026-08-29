@@ -192,6 +192,16 @@ input {
   box-sizing: border-box;
 }
 
+.sidebar-header {
+  /* Pinned to #sidebar's own scroll (the nearest scrolling ancestor), not
+     the viewport — an opaque background is required for sticky, otherwise
+     Gallery content scrolls up visibly underneath it instead of behind it. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+}
+
 .tabs {
   display: flex;
   margin: 0 0 0.75rem;
