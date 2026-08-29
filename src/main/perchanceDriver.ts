@@ -174,6 +174,105 @@ const ATTACH_SAVE_LISTENER_SCRIPT = `
 })();
 `;
 
+// perchance's Shape control (confirmed by hand, 2026-08-29):
+// <div class="input-ctn input-type-select">
+//   <div class="input-inner">
+//     <div class="input-label"><span>🖼️ Shape</span></div>
+//     <div class="input-wrapper">
+//       <select data-name="shape" onchange="...">
+//         <option value="768x768" selected>Square</option>
+//         <option value="512x768">Portrait</option>
+//         <option value="768x512">Landscape</option>
+//       </select>
+//     </div>
+//   </div>
+// </div>
+// Only 2-3 options and picked often enough that a click-to-open dropdown is
+// more friction than it's worth — this replaces it with an always-visible
+// button list next to the (hidden, but still functional) <select>, driving
+// the same element so perchance's own onchange handler still fires exactly
+// as if the dropdown had been used normally.
+const SHAPE_SELECTOR = 'select[data-name="shape"]';
+const INJECT_SHAPE_LIST_SCRIPT = `
+(() => {
+  const BUTTON_CLASS = 'promptloom-shape-btn';
+
+  function signatureOf(select) {
+    return Array.from(select.options).map((o) => o.value).join(',');
+  }
+
+  function syncSelected(select, list) {
+    list.querySelectorAll('.' + BUTTON_CLASS).forEach((btn) => {
+      const active = btn.dataset.value === select.value;
+      btn.style.background = active ? '#2ecc71' : 'transparent';
+      btn.style.color = active ? '#fff' : '';
+      btn.style.fontWeight = active ? 'bold' : 'normal';
+    });
+  }
+
+  function render(select, list) {
+    list.innerHTML = '';
+    Array.from(select.options).forEach((option) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = BUTTON_CLASS;
+      btn.dataset.value = option.value;
+      btn.textContent = option.textContent;
+      btn.style.cssText =
+        'display:block; width:100%; padding:4px 8px; margin-bottom:2px;' +
+        'border-radius:4px; border:1px solid #888; cursor:pointer;' +
+        'text-align:left; background:transparent; font:inherit;';
+      btn.addEventListener('click', () => {
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        syncSelected(select, list);
+      });
+      list.appendChild(btn);
+    });
+    syncSelected(select, list);
+  }
+
+  function convert(select) {
+    if (select.__promptloomListEl) {
+      // The available shapes can change (e.g. switching model) — rebuild
+      // if the option set itself changed, otherwise just re-sync which
+      // button looks selected in case something outside our own clicks
+      // changed select.value.
+      const signature = signatureOf(select);
+      if (select.__promptloomOptionsSignature !== signature) {
+        render(select, select.__promptloomListEl);
+        select.__promptloomOptionsSignature = signature;
+      } else {
+        syncSelected(select, select.__promptloomListEl);
+      }
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'promptloom-shape-list';
+    select.style.display = 'none';
+    select.insertAdjacentElement('afterend', list);
+    select.__promptloomListEl = list;
+    select.__promptloomOptionsSignature = signatureOf(select);
+    render(select, list);
+  }
+
+  function scan() {
+    document.querySelectorAll(${JSON.stringify(SHAPE_SELECTOR)}).forEach(convert);
+  }
+
+  scan();
+  if (window.__promptloomShapeScanInterval) return;
+  window.__promptloomShapeScanInterval = setInterval(scan, 1000);
+  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+})();
+`;
+
+export async function injectShapeListSelect(): Promise<void> {
+  const frame = await findFrameWithSelector(PROMPT_SELECTOR);
+  if (!frame) return; // Same not-fatal reasoning as injectSaveButtons — retried on the next frame load.
+  await frame.executeJavaScript(INJECT_SHAPE_LIST_SCRIPT);
+}
+
 export async function injectSaveButtons(): Promise<void> {
   for (let attempt = 0; attempt < FRAME_SEARCH_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop -- retries must happen sequentially
