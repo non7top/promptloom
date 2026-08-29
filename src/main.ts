@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
-import { registerIpcHandlers } from './main/ipc';
+import { registerIpcHandlers, exportGalleryViaDialog, importGalleryViaDialog } from './main/ipc';
 import { createPerchanceView, openPerchanceDevTools, setLastPerchanceStatus } from './main/perchanceView';
 import { injectSaveButtons } from './main/perchanceDriver';
 import type { PerchanceStatus } from './shared/types';
@@ -61,6 +61,25 @@ const createWindow = () => {
   // with one that also exposes DevTools for the perchance panel directly.
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
+      {
+        label: 'Gallery',
+        submenu: [
+          {
+            label: 'Export Gallery...',
+            click: async () => {
+              const result = await exportGalleryViaDialog(mainWindow);
+              mainWindow.webContents.send('gallery:actionResult', { kind: 'export', result });
+            },
+          },
+          {
+            label: 'Import Gallery...',
+            click: async () => {
+              const result = await importGalleryViaDialog(mainWindow);
+              mainWindow.webContents.send('gallery:actionResult', { kind: 'import', result });
+            },
+          },
+        ],
+      },
       {
         label: 'View',
         submenu: [

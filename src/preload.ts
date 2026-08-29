@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Generation, PerchanceStatus, PromptLoomApi } from './shared/types';
+import type { GalleryActionResult, Generation, PerchanceStatus, PromptLoomApi } from './shared/types';
 
 const api: PromptLoomApi = {
   listCategories: () => ipcRenderer.invoke('categories:list'),
@@ -24,8 +24,6 @@ const api: PromptLoomApi = {
   renameBatch: (oldLabel, newLabel) =>
     ipcRenderer.invoke('generations:renameBatch', oldLabel, newLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
-  exportGallery: () => ipcRenderer.invoke('gallery:export'),
-  importGallery: () => ipcRenderer.invoke('gallery:import'),
 
   populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
   getCurrentStash: () => ipcRenderer.invoke('stash:getCurrent'),
@@ -47,6 +45,12 @@ const api: PromptLoomApi = {
       callback(generation);
     ipcRenderer.on('generations:saved', listener);
     return () => ipcRenderer.removeListener('generations:saved', listener);
+  },
+  onGalleryAction: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, action: GalleryActionResult) =>
+      callback(action);
+    ipcRenderer.on('gallery:actionResult', listener);
+    return () => ipcRenderer.removeListener('gallery:actionResult', listener);
   },
 };
 
