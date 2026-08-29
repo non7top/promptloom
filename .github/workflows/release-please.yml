@@ -50,7 +50,7 @@ jobs:
       # without waiting for a real release. Falls back to the original
       # static red if that link isn't found (e.g. the very first release,
       # which has nothing to compare against). Keep this color scheme in
-      # sync with predict-next-version's copy (used for regular PRs) so
+      # sync with release-please-forecast's copy (used for regular PRs) so
       # RELEASE means the same thing everywhere it shows up.
       - name: Color the RELEASE label by bump type
         if: steps.release.outputs.prs_created == 'true'

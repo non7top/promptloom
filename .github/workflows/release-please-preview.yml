@@ -31,12 +31,12 @@ jobs:
         with:
           node-version: 22
 
-      # Pinned to the exact release, not the moving @v1 tag — confirmed
-      # live that @v1 in that action's own repo doesn't match v1.1.0's
-      # commit (github.com/non7top/release-please-forecast/issues/4).
-      # v1.1.0 adds the bump-type output that recolors the RELEASE label
-      # here (this workflow leaves post-comment at its true default,
-      # unlike build.yml, which is what actually turns that on).
-      - uses: non7top/predict-next-version-action@v1.1.0
+      # Back on the moving @v1 tag. Pinning to v1.1.0 was the workaround for
+      # release-please-forecast#4, but v1.1.0 predates the fix for
+      # release-please-forecast#2, so the pin is what left this repo's own
+      # release PRs predicting 1.0.0 (promptloom#107). @v1 points at v1.2.0,
+      # which has that fix and still has the bump-type output this workflow
+      # relies on to recolor the RELEASE label.
+      - uses: non7top/release-please-forecast@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

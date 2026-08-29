@@ -4,6 +4,12 @@ on:
   push:
     branches: [master]
   pull_request:
+    # `edited` isn't in GitHub's defaults, and this workflow needs it: the
+    # predicted version below names this PR's artifacts, and the prediction
+    # reads the PR title (which is what GitHub puts in the merge commit
+    # body). Retitle a PR without this and no run happens, so the installer
+    # keeps the previous prediction's version in its filename.
+    types: [opened, synchronize, reopened, edited]
     branches: [master]
 
 jobs:
@@ -51,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history and tags: predict-next-version needs to walk back
+          # Full history and tags: release-please-forecast needs to walk back
           # to the last release tag and build its own merge commit on top
           # of this clone.
           fetch-depth: 0
@@ -75,11 +81,14 @@ jobs:
       - name: Predict next version
         id: predict
         if: github.event_name == 'pull_request'
-        # Pinned to the exact release, not the moving @v1 tag — confirmed
-        # live that @v1 in that action's own repo doesn't match v1.1.0's
-        # commit (github.com/non7top/release-please-forecast/issues/4), so
-        # it can't be trusted to carry the bump-type output v1.1.0 added.
-        uses: non7top/predict-next-version-action@v1.1.0
+        # Back on the moving @v1 tag. Pinning to v1.1.0 was the workaround
+        # for release-please-forecast#4, but v1.1.0 predates the fix for
+        # release-please-forecast#2 — so it was the pin that made this
+        # repo's own release PRs predict 1.0.0 instead of the real version
+        # (see promptloom#107). @v1 now points at v1.2.0, which has that
+        # fix, and release-please-forecast#6 moves the major tag from CI on
+        # every release rather than leaving it to be done by hand.
+        uses: non7top/release-please-forecast@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           post-comment: 'false'
