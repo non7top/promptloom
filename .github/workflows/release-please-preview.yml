@@ -2,7 +2,14 @@ name: release-please-preview
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # edited fires on a title/body/base-branch change with no new commits.
+    # This repo merges via real merge commits (not squash), so the PR
+    # title itself doesn't feed release-please's changelog/version
+    # computation — but retargeting a PR's base branch onto (or off of)
+    # master does change whether it should be previewed at all, and that's
+    # also delivered as `edited`, not `synchronize`. A real rebase/
+    # force-push already re-triggers via synchronize on its own.
+    types: [opened, synchronize, reopened, edited]
     branches: [master]
 
 permissions:
@@ -24,6 +31,12 @@ jobs:
         with:
           node-version: 22
 
-      - uses: non7top/predict-next-version-action@v1
+      # Pinned to the exact release, not the moving @v1 tag — confirmed
+      # live that @v1 in that action's own repo doesn't match v1.1.0's
+      # commit (github.com/non7top/release-please-forecast/issues/4).
+      # v1.1.0 adds the bump-type output that recolors the RELEASE label
+      # here (this workflow leaves post-comment at its true default,
+      # unlike build.yml, which is what actually turns that on).
+      - uses: non7top/predict-next-version-action@v1.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -75,7 +75,11 @@ jobs:
       - name: Predict next version
         id: predict
         if: github.event_name == 'pull_request'
-        uses: non7top/predict-next-version-action@v1
+        # Pinned to the exact release, not the moving @v1 tag — confirmed
+        # live that @v1 in that action's own repo doesn't match v1.1.0's
+        # commit (github.com/non7top/release-please-forecast/issues/4), so
+        # it can't be trusted to carry the bump-type output v1.1.0 added.
+        uses: non7top/predict-next-version-action@v1.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           post-comment: 'false'
@@ -94,7 +98,7 @@ jobs:
       - name: Package Windows installer
         run: npm run make
 
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@v4.1.2
 
       # This PR build never becomes a real release, so there's nothing to
       # attach this to — it exists purely to prove the keyless sign/verify
