@@ -7,6 +7,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('promptloomBridge', {
   saveImage: (imageDataUrl: string, prompt: string, seed: string | null) =>
     ipcRenderer.send('perchance:saveImage', imageDataUrl, prompt, seed),
+  // Used by the community-gallery save button (perchanceDriver.ts): those
+  // tiles only expose a remote image URL, not an already-captured data URL,
+  // so the actual download happens in the main process (Node fetch, not
+  // subject to the page's own CORS restrictions) rather than here.
+  saveImageFromUrl: (imageUrl: string, prompt: string, seed: string | null) =>
+    ipcRenderer.send('perchance:saveImageFromUrl', imageUrl, prompt, seed),
 });
 
 // Confirms in DevTools whether this preload is actually running in a given

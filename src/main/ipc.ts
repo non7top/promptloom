@@ -176,4 +176,38 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // Same fire-and-forget shape as perchance:saveImage above, but for a tile
+  // in perchance's own community gallery (perchanceDriver.ts's injected
+  // save button there): those tiles only carry a remote image URL, not an
+  // already-captured data URL, so the bytes are fetched here in the main
+  // process — a page-context fetch()/canvas read would be blocked by the
+  // image host's own CORS policy, which doesn't apply to a Node-side fetch.
+  ipcMain.on(
+    'perchance:saveImageFromUrl',
+    (_event, imageUrl: string, prompt: string, seed: string | null) => {
+      void (async () => {
+        try {
+          const response = await fetch(imageUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${imageUrl}`);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const mimeType = (response.headers.get('content-type') || 'image/png').split(';')[0];
+          const imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+          const generation = db.saveGeneration(
+            currentStash,
+            prompt || '(prompt unavailable)',
+            {},
+            seed,
+            imageDataUrl,
+          );
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('generations:saved', generation);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[PromptLoom] failed to save gallery image from URL', imageUrl, err);
+        }
+      })();
+    },
+  );
 }

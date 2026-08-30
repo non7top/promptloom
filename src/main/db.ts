@@ -249,13 +249,19 @@ export function saveGeneration(
     .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
   const id = Number(lastInsertRowid);
 
-  const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  // Extension follows the data URL's own mime subtype rather than being
+  // hardcoded, since callers other than perchance's own (PNG) save button
+  // — e.g. saving a JPEG straight from the community gallery — pass through
+  // whatever format the source actually was.
+  const match = /^data:image\/(\w+);base64,(.+)$/.exec(imageDataUrl);
+  const ext = match?.[1] || 'png';
+  const base64 = match?.[2] ?? imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
   const imagePath = writeGenerationFiles(
     promptText,
     seed,
     createdAt,
     Buffer.from(base64, 'base64'),
-    'png',
+    ext,
   );
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
 
