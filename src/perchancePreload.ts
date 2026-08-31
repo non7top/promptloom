@@ -10,9 +10,16 @@ contextBridge.exposeInMainWorld('promptloomBridge', {
   // Used by the community-gallery save button (perchanceDriver.ts): those
   // tiles only expose a remote image URL, not an already-captured data URL,
   // so the actual download happens in the main process (Node fetch, not
-  // subject to the page's own CORS restrictions) rather than here.
-  saveImageFromUrl: (imageUrl: string, prompt: string, seed: string | null) =>
-    ipcRenderer.send('perchance:saveImageFromUrl', imageUrl, prompt, seed),
+  // subject to the page's own CORS restrictions) rather than here. imageId
+  // is the tile's own data-image-id, stored as source_gallery_id so a
+  // later checkGallerySaved for the same tile hits the fast path.
+  saveImageFromUrl: (imageUrl: string, prompt: string, seed: string | null, imageId: string | null) =>
+    ipcRenderer.send('perchance:saveImageFromUrl', imageUrl, prompt, seed, imageId),
+  // Request/response (unlike the fire-and-forget saves above) since the
+  // injected script needs the answer before deciding whether to show the
+  // Save button or the ✓ Saved badge for a given tile.
+  checkGallerySaved: (imageId: string, prompt: string, imageUrl: string): Promise<boolean> =>
+    ipcRenderer.invoke('perchance:checkGallerySaved', imageId, prompt, imageUrl),
 });
 
 // Confirms in DevTools whether this preload is actually running in a given
