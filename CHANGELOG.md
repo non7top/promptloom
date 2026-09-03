@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.3.0](https://github.com/non7top/promptloom/compare/v4.2.0...v4.3.0) (2026-09-03)
+
+
+### Features
+
+* add a "Copy as Data URL" right-click menu item ([d0b573c](https://github.com/non7top/promptloom/commit/d0b573c451b07dc2dc82a7b38342cf8ddcd0644a))
+* add a "Copy as Data URL" right-click menu item ([0366227](https://github.com/non7top/promptloom/commit/03662270307b1698172096b5d924d0249b00d2e7))
+* **perchance:** add a save button to perchance's own community gallery ([e564173](https://github.com/non7top/promptloom/commit/e5641737e4821f980d00bfd9bd522a7d5db86a6f))
+* **perchance:** add a save button to perchance's own community gallery ([cac8e29](https://github.com/non7top/promptloom/commit/cac8e294ead17e24248e20030bd22caec6dad71e))
+* **perchance:** match already-saved gallery images by ID, then content ([2e06940](https://github.com/non7top/promptloom/commit/2e0694053b2e379811b19a443f85808a031489a3))
+
 ## [4.2.0](https://github.com/non7top/promptloom/compare/v4.1.0...v4.2.0) (2026-08-29)
 
 
