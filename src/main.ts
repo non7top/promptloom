@@ -4,7 +4,11 @@ import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers, exportGalleryViaDialog, importGalleryViaDialog } from './main/ipc';
 import { createPerchanceView, openPerchanceDevTools, setLastPerchanceStatus } from './main/perchanceView';
-import { injectSaveButtons, injectShapeListSelect } from './main/perchanceDriver';
+import {
+  injectSaveButtons,
+  injectShapeListSelect,
+  injectGallerySaveButtons,
+} from './main/perchanceDriver';
 import type { PerchanceStatus } from './shared/types';
 
 // Electron shows no right-click menu anywhere by default (unlike a normal
@@ -122,6 +126,7 @@ const createWindow = () => {
   perchanceView.webContents.on('did-frame-finish-load', () => {
     injectSaveButtons();
     injectShapeListSelect();
+    injectGallerySaveButtons();
   });
   perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription, _url, isMainFrame) => {
     // did-fail-load fires for any failed resource (ads, trackers, fonts,

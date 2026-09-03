@@ -273,6 +273,163 @@ export async function injectShapeListSelect(): Promise<void> {
   await frame.executeJavaScript(INJECT_SHAPE_LIST_SCRIPT);
 }
 
+// perchance's community-gallery tile (confirmed by hand, 2026-08-30): each
+// result sits in a <div class="imageCtn" data-image-id="..." data-prompt="..."
+// data-negative-prompt="..." data-seed="..." data-guidance-scale="...">,
+// with the actual rendered image at .imageWrapperInner img[src]. This is a
+// different page/tab than the generator's own results grid (.t2i-image-ctn,
+// handled by injectSaveButtons above) — those carry an in-memory dataUrl on
+// the iframe element, these only carry a remote https://aigc.uploads.dev/...
+// URL, so saving means downloading it (done in the main process, see
+// ipc.ts's perchance:saveImageFromUrl — a page-context fetch/canvas read
+// would be subject to that image host's own CORS policy). Whether a tile
+// is already saved is likewise resolved in the main process (ipc.ts's
+// perchance:checkGallerySaved, backed by db.ts): first a fast lookup by
+// data-image-id, falling back to a prompt match + content-hash confirm for
+// anything saved before that ID was tracked.
+const GALLERY_TILE_SELECTOR = '.imageCtn[data-image-id]';
+const INJECT_GALLERY_SAVE_SCRIPT = `
+(() => {
+  // Tracked by data-image-id, which (unlike the generator's own dataUrl) is
+  // stable across perchance's own gallery re-renders. Session-only cache of
+  // *confirmed matches* only (never "confirmed not saved" — a tile can go
+  // from unsaved to saved at any time, e.g. via its own button click).
+  window.__promptloomGallerySavedIds = window.__promptloomGallerySavedIds || new Set();
+  // Tiles awaiting an async checkGallerySaved answer (see runQueue below) —
+  // processed one at a time rather than all at once, so a gallery page full
+  // of tiles doesn't fire off dozens of simultaneous fetch+hash checks.
+  window.__promptloomGalleryCheckQueue = window.__promptloomGalleryCheckQueue || [];
+  window.__promptloomGalleryQueueRunning = window.__promptloomGalleryQueueRunning || false;
+  const BUTTON_CLASS = 'promptloom-gallery-save-btn';
+  const SAVED_CLASS = 'promptloom-gallery-saved-badge';
+
+  function markSaved(tile) {
+    const existingBtn = tile.querySelector('.' + BUTTON_CLASS);
+    if (existingBtn) existingBtn.remove();
+    // outline rather than border: doesn't participate in the box model, so
+    // it can't shift this tile's layout/sizing within the gallery's
+    // flex-wrap grid the way adding a border would. The badge text alone is
+    // too small to register at a glance when scanning a full page of tiles.
+    tile.style.outline = '5px solid #2ecc71';
+    if (tile.querySelector('.' + SAVED_CLASS)) return;
+    if (getComputedStyle(tile).position === 'static') {
+      tile.style.position = 'relative';
+    }
+    const badge = document.createElement('div');
+    badge.className = SAVED_CLASS;
+    badge.textContent = '✓ Saved';
+    badge.style.cssText =
+      'position:absolute; top:4px; left:4px; z-index:9999; pointer-events:none;' +
+      'background:#2ecc71; color:#fff; font:bold 11px sans-serif;' +
+      'padding:2px 6px; border-radius:4px;';
+    tile.appendChild(badge);
+  }
+
+  function attachSaveButton(tile) {
+    if (tile.querySelector('.' + BUTTON_CLASS) || tile.querySelector('.' + SAVED_CLASS)) return;
+    const imageId = tile.dataset.imageId;
+    if (getComputedStyle(tile).position === 'static') {
+      tile.style.position = 'relative';
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = BUTTON_CLASS;
+    btn.textContent = '💾 Save';
+    btn.title = 'Save to PromptLoom';
+    btn.style.cssText =
+      'position:absolute; top:4px; left:4px; z-index:9999; cursor:pointer;' +
+      'background:rgba(0,0,0,0.72); color:#fff; border:1px solid #fff;' +
+      'border-radius:4px; padding:2px 6px; font:bold 11px sans-serif;';
+    // Stops the click from also reaching whatever perchance's own listener
+    // on the tile does (e.g. opening a lightbox).
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const img = tile.querySelector('.imageWrapperInner img');
+      const imageUrl = img && img.src;
+      if (!imageUrl) return;
+      window.promptloomBridge.saveImageFromUrl(imageUrl, tile.dataset.prompt || '', tile.dataset.seed || null, imageId || null);
+      // Optimistic — this is fire-and-forget all the way down (matches
+      // perchance's own save button's UX), so the badge shows immediately
+      // rather than waiting on the main process's download to finish.
+      window.__promptloomGallerySavedIds.add(imageId);
+      markSaved(tile);
+    });
+    tile.appendChild(btn);
+  }
+
+  // Drains __promptloomGalleryCheckQueue one tile at a time — each check
+  // may fetch+hash the remote image (see ipc.ts's perchance:checkGallery-
+  // Saved), so this deliberately awaits each before starting the next
+  // instead of firing them all in parallel.
+  async function runQueue() {
+    if (window.__promptloomGalleryQueueRunning) return;
+    window.__promptloomGalleryQueueRunning = true;
+    while (window.__promptloomGalleryCheckQueue.length) {
+      const tile = window.__promptloomGalleryCheckQueue.shift();
+      const imageId = tile.dataset.imageId;
+      // Tile may have scrolled out and been pruned from the DOM since it
+      // was queued — nothing to attach a button/badge to in that case.
+      if (!imageId || !document.body.contains(tile)) continue;
+      if (window.__promptloomGallerySavedIds.has(imageId)) {
+        markSaved(tile);
+        continue;
+      }
+      try {
+        const img = tile.querySelector('.imageWrapperInner img');
+        const imageUrl = img && img.src;
+        const matched = imageUrl
+          ? await window.promptloomBridge.checkGallerySaved(imageId, tile.dataset.prompt || '', imageUrl)
+          : false;
+        if (matched) {
+          window.__promptloomGallerySavedIds.add(imageId);
+          markSaved(tile);
+        } else {
+          attachSaveButton(tile);
+        }
+      } catch (err) {
+        console.error('[PromptLoom] gallery save-state check failed', err);
+        attachSaveButton(tile); // fail open — a spurious button beats a tile stuck with neither.
+      }
+    }
+    window.__promptloomGalleryQueueRunning = false;
+  }
+
+  function attach(tile) {
+    const imageId = tile.dataset.imageId;
+    if (!imageId || tile.__promptloomChecked) return;
+    if (tile.querySelector('.' + BUTTON_CLASS) || tile.querySelector('.' + SAVED_CLASS)) return;
+    // Already confirmed saved this session (e.g. by clicking its own
+    // button) — no need to round-trip through the queue for that.
+    if (window.__promptloomGallerySavedIds.has(imageId)) {
+      markSaved(tile);
+      return;
+    }
+    tile.__promptloomChecked = true;
+    window.__promptloomGalleryCheckQueue.push(tile);
+    runQueue();
+  }
+
+  function scan() {
+    document.querySelectorAll(${JSON.stringify(GALLERY_TILE_SELECTOR)}).forEach(attach);
+  }
+
+  scan();
+  if (window.__promptloomGalleryScanInterval) return;
+  // The gallery loads more tiles on scroll, so keep re-scanning rather than
+  // attaching once. tile.__promptloomChecked keeps this from re-queuing
+  // (and re-fetching/re-hashing) the same still-present tile every tick.
+  window.__promptloomGalleryScanInterval = setInterval(scan, 1000);
+  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+})();
+`;
+
+export async function injectGallerySaveButtons(): Promise<void> {
+  const frame = await findFrameWithSelector(GALLERY_TILE_SELECTOR);
+  if (!frame) return; // Not fatal — the gallery tab may not be open yet; retried on the next frame load.
+  await frame.executeJavaScript(INJECT_GALLERY_SAVE_SCRIPT);
+}
+
 export async function injectSaveButtons(): Promise<void> {
   for (let attempt = 0; attempt < FRAME_SEARCH_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop -- retries must happen sequentially

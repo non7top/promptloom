@@ -1,6 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import * as db from './db';
 import { populatePrompt } from './perchanceDriver';
 import { getLastPerchanceStatus, setPerchanceViewHidden } from './perchanceView';
@@ -174,6 +175,91 @@ export function registerIpcHandlers(): void {
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send('generations:saved', generation);
       }
+    },
+  );
+
+  // Same fire-and-forget shape as perchance:saveImage above, but for a tile
+  // in perchance's own community gallery (perchanceDriver.ts's injected
+  // save button there): those tiles only carry a remote image URL, not an
+  // already-captured data URL, so the bytes are fetched here in the main
+  // process — a page-context fetch()/canvas read would be blocked by the
+  // image host's own CORS policy, which doesn't apply to a Node-side fetch.
+  ipcMain.on(
+    'perchance:saveImageFromUrl',
+    (
+      _event,
+      imageUrl: string,
+      prompt: string,
+      seed: string | null,
+      imageId: string | null,
+    ) => {
+      void (async () => {
+        try {
+          const response = await fetch(imageUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${imageUrl}`);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const mimeType = (response.headers.get('content-type') || 'image/png').split(';')[0];
+          const imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+          const generation = db.saveGeneration(
+            currentStash,
+            prompt || '(prompt unavailable)',
+            {},
+            seed,
+            imageDataUrl,
+            imageId,
+          );
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('generations:saved', generation);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[PromptLoom] failed to save gallery image from URL', imageUrl, err);
+        }
+      })();
+    },
+  );
+
+  // Answers perchanceDriver.ts's injected gallery script: "is this tile
+  // already saved?" Two-step, cheapest first — see db.ts's
+  // findGenerationBySourceGalleryId/findGenerationsByPromptText for why the
+  // second step exists and can't just trust the prompt match alone.
+  ipcMain.handle(
+    'perchance:checkGallerySaved',
+    async (_event, imageId: string, prompt: string, imageUrl: string): Promise<boolean> => {
+      if (db.findGenerationBySourceGalleryId(imageId)) return true;
+
+      const candidates = db.findGenerationsByPromptText(prompt);
+      if (candidates.length === 0) return false;
+
+      let remoteHash: string;
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) return false;
+        remoteHash = createHash('sha256')
+          .update(Buffer.from(await response.arrayBuffer()))
+          .digest('hex');
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[PromptLoom] failed to fetch gallery image for content match', imageUrl, err);
+        return false;
+      }
+
+      for (const candidate of candidates) {
+        let localHash: string;
+        try {
+          localHash = createHash('sha256').update(fs.readFileSync(candidate.imagePath)).digest('hex');
+        } catch {
+          // The candidate's file may have since been deleted — skip it.
+          continue;
+        }
+        if (localHash === remoteHash) {
+          // Backfills the fast path so the same tile is an instant hit
+          // next time, rather than re-fetching and re-hashing.
+          db.setSourceGalleryId(candidate.id, imageId);
+          return true;
+        }
+      }
+      return false;
     },
   );
 }

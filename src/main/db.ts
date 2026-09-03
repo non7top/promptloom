@@ -30,8 +30,29 @@ export function initDb(userDataPath: string): void {
       selection_json TEXT NOT NULL,
       seed TEXT,
       image_path TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      source_gallery_id TEXT
     );
+  `);
+
+  // CREATE TABLE IF NOT EXISTS above is a no-op for an existing install's
+  // generations table, which predates source_gallery_id — add it explicitly
+  // when missing instead of assuming every install already has it.
+  const generationsColumns = db.prepare('PRAGMA table_info(generations)').all() as {
+    name: string;
+  }[];
+  if (!generationsColumns.some((column) => column.name === 'source_gallery_id')) {
+    db.exec('ALTER TABLE generations ADD COLUMN source_gallery_id TEXT;');
+  }
+  // Backs both halves of the perchance-gallery "already saved?" check
+  // (perchanceDriver.ts's injected script, via ipc.ts's
+  // perchance:checkGallerySaved): the fast path looks up source_gallery_id
+  // directly, the slow path (for anything saved before that column existed,
+  // or saved via the generator's own save button, which never sets it)
+  // looks up prompt_text instead.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_generations_source_gallery_id ON generations(source_gallery_id);
+    CREATE INDEX IF NOT EXISTS idx_generations_prompt_text ON generations(prompt_text);
   `);
 
   imagesDir = path.join(userDataPath, 'images');
@@ -240,22 +261,34 @@ export function saveGeneration(
   selection: Record<number, number>,
   seed: string | null,
   imageDataUrl: string,
+  // Set only when this came from perchance's own community gallery (see
+  // ipc.ts's perchance:saveImageFromUrl) — populates the fast path for
+  // findGenerationBySourceGalleryId below. Every other caller (Composer's
+  // own saves, the generator's own save button, zip imports) leaves it
+  // null, since there's no such external ID to record.
+  sourceGalleryId: string | null = null,
 ): Generation {
   const createdAt = new Date().toISOString();
   const { lastInsertRowid } = db
     .prepare(
-      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at, source_gallery_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
-    .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt);
+    .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt, sourceGalleryId);
   const id = Number(lastInsertRowid);
 
-  const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  // Extension follows the data URL's own mime subtype rather than being
+  // hardcoded, since callers other than perchance's own (PNG) save button
+  // — e.g. saving a JPEG straight from the community gallery — pass through
+  // whatever format the source actually was.
+  const match = /^data:image\/(\w+);base64,(.+)$/.exec(imageDataUrl);
+  const ext = match?.[1] || 'png';
+  const base64 = match?.[2] ?? imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
   const imagePath = writeGenerationFiles(
     promptText,
     seed,
     createdAt,
     Buffer.from(base64, 'base64'),
-    'png',
+    ext,
   );
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
 
@@ -269,6 +302,38 @@ export function saveGeneration(
     imageUrl: pathToFileURL(imagePath).href,
     createdAt,
   };
+}
+
+// Fast path for "has this perchance gallery image already been saved?" —
+// a direct indexed lookup, no network/hashing needed. See
+// findGenerationsByPromptText below for the slow-path fallback this misses
+// (anything saved before source_gallery_id existed, or via the generator's
+// own save button).
+export function findGenerationBySourceGalleryId(sourceGalleryId: string): boolean {
+  const row = db
+    .prepare('SELECT id FROM generations WHERE source_gallery_id = ? LIMIT 1')
+    .get(sourceGalleryId) as { id: number } | undefined;
+  return row !== undefined;
+}
+
+// Slow-path candidates for the same check: an exact prompt_text match is a
+// strong signal on its own (perchance's gallery prompts are long and
+// boilerplate-heavy, rarely identical by coincidence), but not proof by
+// itself — a "custom" save via the generator's own save button can and does
+// reuse identical prompt text across genuinely different images (same
+// prompt, different seed), so the caller still needs to content-hash-
+// compare each candidate's actual bytes against the gallery image's.
+export function findGenerationsByPromptText(promptText: string): { id: number; imagePath: string }[] {
+  const rows = db
+    .prepare('SELECT id, image_path FROM generations WHERE prompt_text = ?')
+    .all(promptText) as { id: number; image_path: string }[];
+  return rows.map((row) => ({ id: row.id, imagePath: row.image_path }));
+}
+
+// Called once a slow-path content-hash match is confirmed, so the same
+// image hits the fast path next time instead of re-fetching and re-hashing.
+export function setSourceGalleryId(id: number, sourceGalleryId: string): void {
+  db.prepare('UPDATE generations SET source_gallery_id = ? WHERE id = ?').run(sourceGalleryId, id);
 }
 
 // A stash label can contain characters that aren't safe as a zip/filesystem
