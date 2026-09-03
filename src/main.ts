@@ -1,5 +1,7 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, clipboard } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
 import { registerIpcHandlers, exportGalleryViaDialog, importGalleryViaDialog } from './main/ipc';
@@ -16,6 +18,27 @@ import type { PerchanceStatus } from './shared/types';
 // including inside the embedded perchance view.
 contextMenu({
   showInspectElement: true,
+  prepend: (_defaultActions, parameters) => [
+    {
+      label: 'Copy as Data URL',
+      // PromptLoom's own Gallery (and anywhere else a saved generation is
+      // shown) always renders from a file:// URL — this is what tells a
+      // locally-saved image apart from e.g. perchance's own gallery images,
+      // which are remote https:// URLs this can't read bytes for directly.
+      visible: parameters.mediaType === 'image' && parameters.srcURL.startsWith('file://'),
+      click: () => {
+        try {
+          const filePath = fileURLToPath(parameters.srcURL);
+          const ext = path.extname(filePath).slice(1).toLowerCase() || 'png';
+          const base64 = fs.readFileSync(filePath).toString('base64');
+          clipboard.writeText(`data:image/${ext};base64,${base64}`);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[PromptLoom] failed to copy image as a data URL', err);
+        }
+      },
+    },
+  ],
 });
 
 // Container/Xvfb dev environments often can't launch any GPU process at all
