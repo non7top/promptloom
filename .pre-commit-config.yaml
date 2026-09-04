@@ -1,4 +1,20 @@
 repos:
+  # release-please derives both the version bump and the changelog purely
+  # from commit subjects, so a malformed one doesn't fail anything — it just
+  # silently drops the change out of the release notes, and out of the bump
+  # if it was meant to be a feat/fix. Catching that at commit time is the
+  # only cheap place: rewriting a subject after it's merged means rewriting
+  # published history.
+  #
+  # Runs at the commit-msg stage, which is already wired up globally
+  # (~/.git/hooks/commit-msg.d/pre-commit-py), so no `pre-commit install`
+  # step is needed for this to take effect.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
   - repo: local
     hooks:
       - id: lint
