@@ -26,6 +26,13 @@ jobs:
       pull-requests: write
       # Needed for the cosign dry-run below to mint a Fulcio cert via OIDC.
       id-token: write
+    env:
+      # Run every containerised step in the Wine image rather than pulling
+      # the dev image as well. Nothing in CI launches the app, so the dev
+      # image's xvfb + Chromium runtime libs are dead weight here, and both
+      # images are node 24 — so this is one image, one `npm ci`, one
+      # node_modules. `make` picks this up via `SERVICE ?= dev`.
+      SERVICE: win
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,35 +41,13 @@ jobs:
           # of this clone.
           fetch-depth: 0
 
-      - uses: docker/setup-buildx-action@v4
-
-      # docker compose build has no cross-run cache on ephemeral GH-hosted
-      # runners, so every run was re-doing the full apt-get install (~90s+
-      # for xvfb + Electron's runtime libs) from scratch. Pre-build the
-      # same image via buildx with the GitHub Actions cache backend, tagged
-      # to match what `docker compose build` will look for (see docker-
-      # compose.yml's top-level `name:`), so that step becomes a fast
-      # cache-hit no-op instead.
-      #
-      # UID/GID must match the `user:` the compose services run as, or the
-      # container's caches come up owned by the wrong uid — the Makefile
-      # derives both from the invoking user, which here is the runner.
-      - name: Build dev image (with layer cache)
-        run: |
-          docker buildx build \
-            --cache-from type=gha,scope=dev \
-            --cache-to type=gha,mode=max,scope=dev \
-            --build-arg UID=$(id -u) \
-            --build-arg GID=$(id -g) \
-            --tag promptloom-dev:latest \
-            --load \
-            -f Dockerfile.dev .
-
-      # Not buildx'd with a layer cache like the dev image above: this one
-      # is a single chown on top of upstream's Wine image, so essentially
+      # The only image CI builds. No buildx layer cache on it deliberately:
+      # it's a single chown on top of upstream's Wine image, so essentially
       # all of its cost is pulling that ~1.5GB base — which a layer cache
-      # doesn't avoid, and which `--load` would then make worse by
-      # re-exporting it into the daemon.
+      # doesn't avoid, and which `--load` would make worse by re-exporting
+      # it into the daemon. Measured 96s, the largest step in the job; if
+      # that needs to come down, a slim prebuilt image on GHCR is the
+      # lever, not a layer cache.
       - name: Build Windows cross-build image
         run: make image-win
 

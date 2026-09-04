@@ -1,4 +1,11 @@
-FROM node:22-bookworm
+# node 24 to match the runtime the app actually runs on: Electron 44 bundles
+# node 24.18.1 (`ELECTRON_RUN_AS_NODE=1 electron -p process.versions.node`),
+# and the Wine packaging image is node 24 as well. The scaffold commit pinned
+# 22 and nothing revisited it since, which left every tool here a major
+# version behind production for no stated reason — there's no `engines` field
+# asking for 22, and the README's node:sqlite note is about Electron's
+# bundled node, not this image's.
+FROM node:24-bookworm
 
 # Electron (Chromium) runtime dependencies + Xvfb for headless GUI runs.
 RUN apt-get update && apt-get install -y --no-install-recommends \

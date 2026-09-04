@@ -8,6 +8,14 @@ export DOCKER_GID := $(shell id -g)
 
 COMPOSE := docker compose
 
+# Which service ordinary commands run in. Locally this is `dev` — the small
+# image, which also carries xvfb and Electron's runtime libs for `make
+# start`. CI sets SERVICE=win so one image does install, checks, bundle and
+# packaging: it saves pulling a second image for steps the Wine image can
+# run anyway, and both are node 24. (`?=` defers to the environment, so
+# exporting SERVICE is enough — no need to pass it per target.)
+SERVICE ?= dev
+
 .PHONY: help image-dev image-win install lint typecheck check build win publish-win start stop destroy
 
 help: ## Show this help
@@ -21,18 +29,18 @@ image-win: ## Build the Wine cross-build image
 	$(COMPOSE) build win
 
 install: ## Install dependencies into the node_modules volume
-	$(COMPOSE) run --rm dev npm ci
+	$(COMPOSE) run --rm $(SERVICE) npm ci
 
 lint: ## Run biome
-	$(COMPOSE) run --rm dev npm run lint
+	$(COMPOSE) run --rm $(SERVICE) npm run lint
 
 typecheck: ## Run tsc --noEmit
-	$(COMPOSE) run --rm dev npx tsc --noEmit
+	$(COMPOSE) run --rm $(SERVICE) npx tsc --noEmit
 
 check: lint typecheck ## Lint and type-check
 
 build: ## Bundle main/preload/renderer into out/
-	$(COMPOSE) run --rm dev npm run build
+	$(COMPOSE) run --rm $(SERVICE) npm run build
 
 # Depends on build: electron-builder packages whatever is in out/ (see
 # `files:` in electron-builder.yml), so packaging a stale bundle is the
@@ -46,6 +54,8 @@ win: build ## Cross-build the Windows NSIS installer into dist/ (Wine)
 publish-win: build ## Cross-build the installer and publish it to the GitHub release
 	$(COMPOSE) run --rm -e GH_TOKEN -e GITHUB_TOKEN win npx electron-builder --win --publish always
 
+# Always `dev`, never $(SERVICE): the Wine image has no xvfb and none of
+# Electron's Chromium runtime libs, so the app can't launch there.
 start: ## Run the app (needs an X server on $$DISPLAY)
 	$(COMPOSE) run --rm dev npm start
 

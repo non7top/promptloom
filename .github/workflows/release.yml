@@ -72,6 +72,8 @@ jobs:
       # Keyless cosign signing exchanges this job's OIDC token for a
       # short-lived Fulcio cert — no signing key ever touches the repo.
       id-token: write
+    env:
+      SERVICE: win
     steps:
       - uses: actions/checkout@v7
         with:
@@ -81,18 +83,11 @@ jobs:
           # instead of reproducing the original build byte-for-byte.
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build images
-        run: |
-          docker buildx build \
-            --cache-from type=gha,scope=dev \
-            --build-arg UID=$(id -u) \
-            --build-arg GID=$(id -g) \
-            --tag promptloom-dev:latest \
-            --load \
-            -f Dockerfile.dev .
-          make image-win
+      # Same single-image approach as build.yml: SERVICE=win below puts the
+      # install and bundle steps in the Wine image too, so the dev image
+      # (xvfb + Chromium runtime libs, none of it used here) is never built.
+      - name: Build Windows cross-build image
+        run: make image-win
 
       - name: Install dependencies
         run: make install
