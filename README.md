@@ -32,14 +32,19 @@ challenge by hand once per machine.
 
 ## Development
 
-All tooling runs in Docker — nothing needs to be installed on the host.
+All tooling runs in Docker — nothing needs to be installed on the host. The
+`Makefile` is the entry point; `make help` lists every target.
 
 ```sh
-docker compose build dev
-docker compose run --rm dev npm install
-docker compose run --rm dev npm run lint
-docker compose run --rm dev npx tsc --noEmit
+make image-dev   # build the dev image
+make install     # npm ci into the node_modules volume
+make check       # biome + tsc --noEmit
+make build       # bundle main/preload/renderer into out/
+make destroy     # drop containers, local images and cache volumes
 ```
+
+The containers run as your own uid/gid (the Makefile passes them in), so
+nothing they write into the working directory comes back root-owned.
 
 To run the app itself, Electron needs a display. On Linux, forward your X
 server into the container:
@@ -121,9 +126,23 @@ it isn't rediscovered the hard way again:
 ## Packaging
 
 ```sh
-docker compose run --rm dev npm run make
+make win
 ```
 
-Windows installers (NSIS) are built by CI on a `windows-latest` runner (see
-`.github/workflows/release.yml`) — electron-builder's NSIS/deb/rpm targets
-all cross-build from Linux except Windows's, which needs a real Windows host.
+That produces the Windows NSIS installer in `dist/` **from Linux**, by
+running electron-builder under Wine in a separate container
+(`Dockerfile.win`, built on upstream's `electronuserland/builder:wine`).
+The whole NSIS pipeline works there, uninstaller and block map included —
+the uninstaller step runs the freshly-built installer under Wine, which is
+why that image chowns `$HOME` to the build uid rather than just making it
+writable (Wine refuses a `HOME` it doesn't own).
+
+CI does the same thing on `ubuntu-latest` for both the per-PR installer
+(`.github/workflows/build.yml`) and the published release
+(`.github/workflows/release.yml`). It used to need a `windows-latest`
+runner; it doesn't, and Windows minutes bill at 1.67x Linux.
+
+Not covered: Authenticode signing. Releases are signed with cosign
+(sigstore) over the finished `.exe`, so there's no `signtool` certificate in
+play — a real code-signing cert would need its own look at whether Wine's
+`signtool` is up to it.

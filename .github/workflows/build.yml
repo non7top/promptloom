@@ -13,42 +13,14 @@ on:
     branches: [master]
 
 jobs:
+  # One job, not the old lint-on-Linux + package-on-Windows pair. The
+  # Windows installer cross-builds under Wine (see Dockerfile.win), which
+  # removes the only reason a Windows runner was involved — and Windows
+  # minutes bill at 1.67x Linux. Chaining also means a single checkout and
+  # a single `npm ci` feed the lint, type-check, bundle and package steps,
+  # instead of each runner installing the tree for itself.
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4
-
-      # docker compose build has no cross-run cache on ephemeral GH-hosted
-      # runners, so every run was re-doing the full apt-get install (~90s+
-      # for xvfb + Electron's runtime libs) from scratch. Pre-build the
-      # same image via buildx with the GitHub Actions cache backend, tagged
-      # to match what `docker compose build` will look for (see docker-
-      # compose.yml's top-level `name:`), so that step becomes a fast
-      # cache-hit no-op instead.
-      - name: Build dev image (with layer cache)
-        run: |
-          docker buildx build \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --tag promptloom-dev:latest \
-            --load \
-            -f Dockerfile.dev .
-      - name: Build dev image
-        run: docker compose build dev
-
-      - name: Install dependencies
-        run: docker compose run --rm dev npm ci
-
-      - name: Lint
-        run: docker compose run --rm dev npm run lint
-
-      - name: Type-check
-        run: docker compose run --rm dev npx tsc --noEmit
-
-  build-windows:
-    runs-on: windows-latest
     permissions:
       contents: read
       pull-requests: write
@@ -62,22 +34,51 @@ jobs:
           # of this clone.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
+      - uses: docker/setup-buildx-action@v4
+
+      # docker compose build has no cross-run cache on ephemeral GH-hosted
+      # runners, so every run was re-doing the full apt-get install (~90s+
+      # for xvfb + Electron's runtime libs) from scratch. Pre-build the
+      # same image via buildx with the GitHub Actions cache backend, tagged
+      # to match what `docker compose build` will look for (see docker-
+      # compose.yml's top-level `name:`), so that step becomes a fast
+      # cache-hit no-op instead.
+      #
+      # UID/GID must match the `user:` the compose services run as, or the
+      # container's caches come up owned by the wrong uid — the Makefile
+      # derives both from the invoking user, which here is the runner.
+      - name: Build dev image (with layer cache)
+        run: |
+          docker buildx build \
+            --cache-from type=gha,scope=dev \
+            --cache-to type=gha,mode=max,scope=dev \
+            --build-arg UID=$(id -u) \
+            --build-arg GID=$(id -g) \
+            --tag promptloom-dev:latest \
+            --load \
+            -f Dockerfile.dev .
+
+      # Not buildx'd with a layer cache like the dev image above: this one
+      # is a single chown on top of upstream's Wine image, so essentially
+      # all of its cost is pulling that ~1.5GB base — which a layer cache
+      # doesn't avoid, and which `--load` would then make worse by
+      # re-exporting it into the daemon.
+      - name: Build Windows cross-build image
+        run: make image-win
 
       - name: Install dependencies
-        run: npm ci
+        run: make install
 
-      - name: Compute short SHA
-        id: vars
-        shell: bash
-        run: echo "sha_short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+      - name: Lint and type-check
+        run: make check
 
       # post-comment: false — this action's own PR comment/RELEASE-label
       # side effects are release-please-preview.yml's job; here we only
       # want the predicted version, to name this PR's build artifacts.
+      #
+      # This was the single most expensive step in the old pipeline (114s)
+      # and the least Windows-specific: it only walks git history and
+      # simulates a release-please run.
       - name: Predict next version
         id: predict
         if: github.event_name == 'pull_request'
@@ -101,11 +102,17 @@ jobs:
       # not whatever the action happened to leave checked out.
       - name: Restore the PR's own head commit for the build
         if: github.event_name == 'pull_request'
-        shell: bash
         run: git checkout preview-head
 
+      - name: Compute short SHA
+        id: vars
+        run: echo "sha_short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      # `make win` bundles into out/ first, then runs electron-builder
+      # --win under Wine. Reuses the node_modules the install step above
+      # populated rather than installing again.
       - name: Package Windows installer
-        run: npm run make
+        run: make win
 
       - uses: sigstore/cosign-installer@v4.1.2
 
@@ -115,7 +122,6 @@ jobs:
       # installer file before that (CI-unverifiable) step ever runs for
       # real. See release.yml for the step that matters.
       - name: Cosign sign/verify dry run
-        shell: bash
         run: |
           EXE_PATH=$(find dist -maxdepth 1 -name '*.exe' | head -1)
           cosign sign-blob --yes --bundle "$EXE_PATH.cosign.bundle" "$EXE_PATH"
@@ -133,7 +139,6 @@ jobs:
       - name: Rename build artifact to the predicted version
         id: artifact_names
         if: github.event_name == 'pull_request' && steps.predict.outputs.version != ''
-        shell: bash
         run: |
           VERSION_TAG="${{ steps.predict.outputs.version }}-rc${{ github.event.pull_request.number }}"
           EXE_PATH=$(find dist -maxdepth 1 -name '*.exe' | head -1)
@@ -159,7 +164,6 @@ jobs:
 
       - name: Comment download link on PR
         if: github.event_name == 'pull_request'
-        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

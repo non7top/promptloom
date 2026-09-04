@@ -16,4 +16,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdrm2 \
     && rm -rf /var/lib/apt/lists/*
 
+ARG UID=1000
+ARG GID=1000
+
+# node:* ships a `node` user at uid 1000, which is not necessarily the
+# host's — so own the caches by the uid this actually runs as, passed in
+# from the Makefile. Without a writable HOME, npm fails outright on any
+# command that touches the registry ("EACCES ... mkdir '/.npm'"), which is
+# every install; npm_config_cache then makes that cache a named volume so
+# `make install` isn't a cold download each time.
+# /app/node_modules is created here purely so the named volume mounted over
+# it inherits this ownership: a volume whose mount path doesn't exist in the
+# image comes up root-owned, and `npm ci` as a non-root user then dies with
+# "EACCES, rmdir '/app/node_modules/.bin'".
+RUN mkdir -p /cache/home /cache/npm /app/node_modules \
+    && chown -R ${UID}:${GID} /cache /app/node_modules
+
+ENV HOME=/cache/home \
+    npm_config_cache=/cache/npm
+
 WORKDIR /app
