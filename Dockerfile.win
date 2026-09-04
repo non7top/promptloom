@@ -27,7 +27,13 @@ ARG GID=1000
 RUN mkdir -p /cache/home /cache/npm /cache/electron /cache/electron-builder /app/node_modules \
     && chown -R ${UID}:${GID} /cache /app/node_modules
 
-ENV HOME=/cache/home \
+# Silences Wine's debug channels. Measured over 3 runs each, warm caches:
+# 64/62/64s without it, 60/61/60s with — a consistent ~3s (4.7%), with the
+# two ranges not overlapping. Small, but free, and it keeps the build log
+# readable. Not a lever on CI time: the job's dominant cost is the ~96s
+# image pull, not the build itself.
+ENV WINEDEBUG=-all \
+    HOME=/cache/home \
     npm_config_cache=/cache/npm \
     ELECTRON_CACHE=/cache/electron \
     ELECTRON_BUILDER_CACHE=/cache/electron-builder
