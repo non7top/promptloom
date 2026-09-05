@@ -4,14 +4,55 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import AdmZip from 'adm-zip';
-import type { Category, Item, Generation, GalleryImportResult } from '../shared/types';
+import type {
+  Category,
+  Item,
+  Generation,
+  GalleryImportResult,
+  IntegrityResult,
+  LibraryInfo,
+} from '../shared/types';
+import {
+  LEGACY_IMAGES_DIRNAME,
+  groupDir,
+  jsonPathFor,
+  imageJsonContent,
+  resolveImagePath,
+  sidecarPathFor,
+  stashesDir,
+  toStoredPath,
+  freeSpaceBytes,
+  labelToRelDir,
+} from './storage';
 
 let db: DatabaseSync;
 let imagesDir: string;
+// Root of the active library. Every stored image_path is relative to this
+// (older rows are still absolute — see resolveImagePath), which is what lets
+// a library be moved to another disk or machine and still open.
+let libraryRoot: string;
 
-export function initDb(userDataPath: string): void {
-  db = new DatabaseSync(path.join(userDataPath, 'promptloom.sqlite'));
+export function getDb(): DatabaseSync {
+  return db;
+}
+
+export function getLibraryRoot(): string {
+  return libraryRoot;
+}
+
+export function initDb(libraryPath: string): void {
+  libraryRoot = libraryPath;
+  fs.mkdirSync(libraryPath, { recursive: true });
+  db = new DatabaseSync(path.join(libraryPath, 'promptloom.sqlite'));
   db.exec('PRAGMA foreign_keys = ON;');
+  // WAL survives an abrupt process death far better than the default
+  // rollback journal, and lets reads continue during a write — which
+  // matters here because saves arrive from perchance while the Gallery is
+  // reading. NORMAL is the standard pairing with WAL: it only gives up
+  // durability for the last transaction on an OS-level crash, not on an
+  // app crash, and never risks corruption.
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = NORMAL;');
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +96,63 @@ export function initDb(userDataPath: string): void {
     CREATE INDEX IF NOT EXISTS idx_generations_prompt_text ON generations(prompt_text);
   `);
 
-  imagesDir = path.join(userDataPath, 'images');
+  // Still created: it stays the home for anything not yet migrated into
+  // stashes/, and migrateLibrary only removes it once it is genuinely empty.
+  imagesDir = path.join(libraryPath, LEGACY_IMAGES_DIRNAME);
   fs.mkdirSync(imagesDir, { recursive: true });
+  fs.mkdirSync(stashesDir(libraryPath), { recursive: true });
+}
+
+// A .sqlite file written by SQLite itself rather than a dump — restoring is
+// a file copy. VACUUM INTO takes a consistent snapshot without blocking
+// writers, so this is safe to run while the app is in use.
+export function backupLibrary(): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = path.join(libraryRoot, `promptloom.backup-${stamp}.sqlite`);
+  db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+  return target;
+}
+
+export function checkIntegrity(): IntegrityResult {
+  const rows = db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[];
+  const detail = rows.map((row) => row.integrity_check).join('\n');
+  return { ok: detail.trim() === 'ok', detail };
+}
+
+export function libraryStats(defaultLibraryPath: string, recent: string[]): LibraryInfo {
+  const rows = db
+    .prepare('SELECT image_path AS p, batch_label AS l FROM generations')
+    .all() as { p: string; l: string }[];
+
+  let imageBytes = 0;
+  let migrated = rows.length > 0;
+  const labels = new Set<string>();
+  const stashRoot = stashesDir(libraryRoot);
+
+  for (const row of rows) {
+    labels.add(row.l || 'Unsorted');
+    const absolute = resolveImagePath(libraryRoot, row.p);
+    if (!absolute.startsWith(stashRoot)) migrated = false;
+    try {
+      imageBytes += fs.statSync(absolute).size;
+    } catch {
+      // Counted as zero rather than failing the whole stat sweep — a
+      // missing file is what the migration's own report is for.
+    }
+  }
+
+  const dbPath = path.join(libraryRoot, 'promptloom.sqlite');
+  return {
+    libraryPath: libraryRoot,
+    defaultLibraryPath,
+    recent,
+    generations: rows.length,
+    groups: labels.size,
+    imageBytes,
+    dbBytes: fs.existsSync(dbPath) ? fs.statSync(dbPath).size : 0,
+    freeBytes: freeSpaceBytes(libraryRoot),
+    migrated,
+  };
 }
 
 export function listCategories(): Category[] {
@@ -217,8 +313,8 @@ export function listGenerations(): Generation[] {
     promptText: row.prompt_text,
     selection: JSON.parse(row.selection_json),
     seed: row.seed,
-    imagePath: row.image_path,
-    imageUrl: pathToFileURL(row.image_path).href,
+    imagePath: resolveImagePath(libraryRoot, row.image_path),
+    imageUrl: pathToFileURL(resolveImagePath(libraryRoot, row.image_path)).href,
     createdAt: row.created_at,
   }));
 }
@@ -238,21 +334,42 @@ export function sidecarText(promptText: string, seed: string | null, createdAt: 
 // millions of these, and there's no reason to expose (or rely on) the DB's
 // row order in the filename. Shared by saveGeneration (renderer capture, a
 // data URL) and importGalleryZip (a zip entry, already raw bytes).
+// Writes straight into the stash's own folder rather than one flat images/
+// directory, and returns a path relative to the library root so the whole
+// library stays portable. The trio written here (image, .txt, .json) is the
+// same trio the migration produces for pre-existing rows.
 function writeGenerationFiles(
+  id: number,
+  batchLabel: string,
   promptText: string,
+  selection: Record<number, number>,
   seed: string | null,
   createdAt: string,
   imageBytes: Buffer,
   ext: string,
 ): string {
   const baseName = randomUUID();
-  const imagePath = path.join(imagesDir, `${baseName}.${ext}`);
+  const dir = groupDir(libraryRoot, batchLabel || 'Unsorted');
+  fs.mkdirSync(dir, { recursive: true });
+  const imagePath = path.join(dir, `${baseName}.${ext}`);
   fs.writeFileSync(imagePath, imageBytes);
+  fs.writeFileSync(sidecarPathFor(imagePath), sidecarText(promptText, seed, createdAt));
   fs.writeFileSync(
-    path.join(imagesDir, `${baseName}.txt`),
-    sidecarText(promptText, seed, createdAt),
+    jsonPathFor(imagePath),
+    imageJsonContent(
+      {
+        id,
+        batch_label: batchLabel,
+        prompt_text: promptText,
+        selection_json: JSON.stringify(selection),
+        seed,
+        image_path: imagePath,
+        created_at: createdAt,
+      },
+      path.basename(imagePath),
+    ),
   );
-  return imagePath;
+  return toStoredPath(libraryRoot, imagePath);
 }
 
 export function saveGeneration(
@@ -283,14 +400,18 @@ export function saveGeneration(
   const match = /^data:image\/(\w+);base64,(.+)$/.exec(imageDataUrl);
   const ext = match?.[1] || 'png';
   const base64 = match?.[2] ?? imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-  const imagePath = writeGenerationFiles(
+  const storedPath = writeGenerationFiles(
+    id,
+    batchLabel,
     promptText,
+    selection,
     seed,
     createdAt,
     Buffer.from(base64, 'base64'),
     ext,
   );
-  db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(imagePath, id);
+  db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(storedPath, id);
+  const imagePath = resolveImagePath(libraryRoot, storedPath);
 
   return {
     id,
@@ -472,16 +593,27 @@ export function importGalleryZip(zipPath: string): GalleryImportResult {
   for (const item of pending) {
     const ext = IMPORT_IMAGE_EXT.exec(item.image.entryName)?.[1].toLowerCase() ?? 'png';
     const createdAt = item.createdAt ?? new Date().toISOString();
-    const imagePath = writeGenerationFiles(
+    // Insert first for the row id (the per-image .json records it), then
+    // write the files, then fill in the path — the same order saveGeneration
+    // uses. Insert order still fixes each row's auto-increment id, which is
+    // what the sort above exists to control.
+    const { lastInsertRowid } = db
+      .prepare(
+        'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(item.batchLabel, item.promptText, JSON.stringify({}), item.seed, '', createdAt);
+    const id = Number(lastInsertRowid);
+    const storedPath = writeGenerationFiles(
+      id,
+      item.batchLabel,
       item.promptText,
+      {},
       item.seed,
       createdAt,
       item.image.getData(),
       ext,
     );
-    db.prepare(
-      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    ).run(item.batchLabel, item.promptText, JSON.stringify({}), item.seed, imagePath, createdAt);
+    db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(storedPath, id);
     imported += 1;
   }
 
@@ -511,15 +643,25 @@ export function getGeneration(id: number): Generation | null {
     promptText: row.prompt_text,
     selection: JSON.parse(row.selection_json),
     seed: row.seed,
-    imagePath: row.image_path,
-    imageUrl: pathToFileURL(row.image_path).href,
+    imagePath: resolveImagePath(libraryRoot, row.image_path),
+    imageUrl: pathToFileURL(resolveImagePath(libraryRoot, row.image_path)).href,
     createdAt: row.created_at,
   };
 }
 
-function removeImageAndSidecar(imagePath: string): void {
+// Takes the *stored* path (relative for migrated rows, absolute for older
+// ones) and resolves it here, so callers don't each have to remember to.
+//
+// The sidecar path comes from sidecarPathFor, which strips whatever
+// extension the image actually has. The previous version stripped only
+// `.png`, so for the half of the library stored as .jpeg it built
+// "<uuid>.jpeg.txt" — a path that never exists — and `force: true` swallowed
+// the miss, orphaning the sidecar every time a .jpeg generation was deleted.
+function removeImageAndSidecar(storedPath: string): void {
+  const imagePath = resolveImagePath(libraryRoot, storedPath);
   fs.rmSync(imagePath, { force: true });
-  fs.rmSync(imagePath.replace(/\.png$/i, '') + '.txt', { force: true });
+  fs.rmSync(sidecarPathFor(imagePath), { force: true });
+  fs.rmSync(jsonPathFor(imagePath), { force: true });
 }
 
 export function deleteGeneration(id: number): void {
@@ -540,11 +682,54 @@ export function deleteBatch(batchLabel: string): void {
   for (const row of rows) {
     removeImageAndSidecar(row.image_path);
   }
+  // Only the index.json this app wrote, and only if nothing else remains —
+  // a stash folder a user has dropped their own files into is left alone.
+  const dir = groupDir(libraryRoot, batchLabel || 'Unsorted');
+  try {
+    if (fs.existsSync(dir)) {
+      const leftovers = fs.readdirSync(dir);
+      if (leftovers.length === 1 && leftovers[0] === 'index.json') {
+        fs.rmSync(path.join(dir, 'index.json'), { force: true });
+      }
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+    }
+  } catch {
+    // An empty folder left behind is cosmetic, never worth failing on.
+  }
 }
 
 export function renameBatch(oldLabel: string, newLabel: string): void {
+  const from = groupDir(libraryRoot, oldLabel || 'Unsorted');
+  const to = groupDir(libraryRoot, newLabel || 'Unsorted');
+
   db.prepare('UPDATE generations SET batch_label = ? WHERE batch_label = ?').run(
     newLabel,
     oldLabel,
   );
+
+  // The rows' stored paths still point into the old folder, so the folder
+  // has to follow the label and every affected path has to be rewritten.
+  // Skipped entirely when the target already exists: merging two stashes on
+  // disk is a different operation from renaming one, and doing it silently
+  // here would be a surprise.
+  if (from === to || !fs.existsSync(from) || fs.existsSync(to)) return;
+  try {
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.renameSync(from, to);
+    const rows = db
+      .prepare('SELECT id, image_path FROM generations WHERE batch_label = ?')
+      .all(newLabel) as { id: number; image_path: string }[];
+    for (const row of rows) {
+      const absolute = resolveImagePath(libraryRoot, row.image_path);
+      if (!absolute.startsWith(from)) continue;
+      const moved = path.join(to, path.relative(from, absolute));
+      db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(
+        toStoredPath(libraryRoot, moved),
+        row.id,
+      );
+    }
+  } catch {
+    // Label is renamed either way; the folder simply keeps its old name,
+    // which the next migration/index rebuild reconciles.
+  }
 }

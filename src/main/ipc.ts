@@ -1,10 +1,12 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { ipcMain, dialog, BrowserWindow, app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as db from './db';
 import { populatePrompt } from './perchanceDriver';
 import { getLastPerchanceStatus, setPerchanceViewHidden } from './perchanceView';
+import { getDefaultLibraryPath, loadSettings, setLibraryPath } from './settings';
+import { migrateLibrary, planMigration, rollbackMigration } from './storage';
 import type { GalleryExportResult, GalleryImportResult } from '../shared/types';
 
 // Triggered from the native app menu (main.ts), not a renderer button —
@@ -93,6 +95,65 @@ export function registerIpcHandlers(): void {
 
     return db.importDefinitionsText(fs.readFileSync(filePaths[0], 'utf-8'));
   });
+
+  // --- Library / storage maintenance -------------------------------------
+  // All of these are driven from the Settings tab rather than the native
+  // menu: they're about the library as a whole, and a user who has just
+  // pointed the app at a different folder needs them in the same place they
+  // did the pointing.
+  ipcMain.handle('library:info', () => {
+    const settings = loadSettings();
+    return db.libraryStats(getDefaultLibraryPath(), settings.recent);
+  });
+
+  ipcMain.handle('library:choose', async () => {
+    const window = BrowserWindow.getAllWindows()[0] ?? null;
+    const openOptions = {
+      title: 'Choose a PromptLoom library folder',
+      properties: ['openDirectory' as const, 'createDirectory' as const],
+    };
+    const { canceled, filePaths } = window
+      ? await dialog.showOpenDialog(window, openOptions)
+      : await dialog.showOpenDialog(openOptions);
+    if (canceled || filePaths.length === 0) return null;
+    return filePaths[0];
+  });
+
+  ipcMain.handle('library:open', (_event, libraryPath: string) => {
+    // An existing library is anything already holding a database or a
+    // stashes tree; an empty folder is initialised as a fresh library on
+    // next launch. Anything else (a folder full of unrelated files) is
+    // refused rather than scattering app data through it.
+    const hasDb = fs.existsSync(path.join(libraryPath, 'promptloom.sqlite'));
+    const hasStashes = fs.existsSync(path.join(libraryPath, 'stashes'));
+    const isEmpty = fs.existsSync(libraryPath) && fs.readdirSync(libraryPath).length === 0;
+    if (!hasDb && !hasStashes && !isEmpty) return false;
+
+    setLibraryPath(libraryPath);
+    // Relaunch rather than swapping the SQLite handle underneath a live
+    // renderer: a perchance save can be in flight, and every path the
+    // Gallery is holding would be invalidated mid-render.
+    app.relaunch();
+    app.quit();
+    return true;
+  });
+
+  ipcMain.handle('library:planMigration', () => planMigration(db.getDb(), db.getLibraryRoot()));
+  ipcMain.handle('library:migrate', () => migrateLibrary(db.getDb(), db.getLibraryRoot()));
+  ipcMain.handle('library:rollback', async () => {
+    const root = db.getLibraryRoot();
+    // Newest manifest wins — rollback is an "undo the migration I just ran"
+    // action, not a general time machine.
+    const manifests = fs
+      .readdirSync(root)
+      .filter((name) => /^migration-.*\.jsonl$/.test(name))
+      .sort();
+    const latest = manifests.at(-1);
+    if (!latest) return null;
+    return rollbackMigration(db.getDb(), root, path.join(root, latest));
+  });
+  ipcMain.handle('library:backup', () => db.backupLibrary());
+  ipcMain.handle('library:integrity', () => db.checkIntegrity());
 
   ipcMain.handle('generations:list', () => db.listGenerations());
   ipcMain.handle(

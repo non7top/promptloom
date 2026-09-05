@@ -3,9 +3,10 @@ import type { Category, Item } from '../shared/types';
 import DefinitionManager from './DefinitionManager';
 import Composer from './Composer';
 import Gallery from './Gallery';
+import Settings from './Settings';
 import TagFilter, { countItems, filterByQuery } from './TagFilter';
 
-type Tab = 'definitions' | 'composer' | 'gallery';
+type Tab = 'definitions' | 'composer' | 'gallery' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('definitions');
@@ -74,6 +75,17 @@ export default function App() {
           <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
             Gallery
           </button>
+          {/* Icon-sized like the collapse button rather than a fourth
+              equal-width tab: at 380px a fourth full tab leaves ~82px each
+              and "Definitions" wraps. */}
+          <button
+            className={`tab-icon${tab === 'settings' ? ' active' : ''}`}
+            title="Settings"
+            aria-label="Settings"
+            onClick={() => setTab('settings')}
+          >
+            ⚙
+          </button>
           <button
             className="tab-collapse"
             title={rightPanelCollapsed ? 'Show perchance panel' : 'Collapse right panel'}
@@ -96,9 +108,11 @@ export default function App() {
             placeholder="Unsorted"
           />
         </div>
-        {/* Only the tag-listing tabs — the Gallery lists stashes of images,
-            which this query has nothing to say about. */}
-        {tab !== 'gallery' && items.length > 0 && (
+        {/* Only the tag-listing tabs. Named explicitly rather than excluding
+            Gallery: this was `tab !== 'gallery'` when there were three tabs,
+            and adding Settings silently opted it in to a tab that lists no
+            tags at all. */}
+        {(tab === 'definitions' || tab === 'composer') && items.length > 0 && (
           <TagFilter
             value={tagFilter}
             onChange={setTagFilter}
@@ -127,6 +141,7 @@ export default function App() {
         />
       </div>
       {tab === 'gallery' && <Gallery />}
+      {tab === 'settings' && <Settings />}
     </div>
   );
 }
