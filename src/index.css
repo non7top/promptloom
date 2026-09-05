@@ -267,6 +267,26 @@ input {
   height: auto;
 }
 
+/* Find-as-you-type box for the Definitions/Composer tag lists. Lives inside
+   .sidebar-header, so it inherits that block's sticky positioning and stays
+   reachable while scrolling a long list rather than needing its own. */
+.tag-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+}
+
+.tag-filter input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tag-filter .hint {
+  margin: 0;
+  white-space: nowrap;
+}
+
 .category {
   position: relative;
   border: 1px solid #c9d6ea;
