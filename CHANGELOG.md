@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.5.0](https://github.com/non7top/promptloom/compare/v4.4.0...v4.5.0) (2026-09-05)
+
+
+### Features
+
+* **storage:** per-stash folders, a configurable library, and a Settings tab ([8375b95](https://github.com/non7top/promptloom/commit/8375b95fc8e52af262950dee653beebc9d7ca64b))
+* **storage:** per-stash folders, a configurable library, and a Settings tab ([2323c56](https://github.com/non7top/promptloom/commit/2323c56e98d5a6f25b4ec4ad9430fc50146a209a))
+
+
+### Bug Fixes
+
+* **gallery:** stop loading every saved image into memory at once ([d4aa4eb](https://github.com/non7top/promptloom/commit/d4aa4ebf0fe57bc8cacab1325f37ba53fab2a4ac))
+* **gallery:** stop loading every saved image into memory at once ([4791124](https://github.com/non7top/promptloom/commit/4791124057c0519bff62dde481d91635236eec6d))
+
 ## [4.4.0](https://github.com/non7top/promptloom/compare/v4.3.0...v4.4.0) (2026-09-05)
 
 
