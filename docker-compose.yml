@@ -5,17 +5,59 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        UID: "${DOCKER_UID:-1000}"
+        GID: "${DOCKER_GID:-1000}"
     working_dir: /app
     init: true
     shm_size: '1gb'
+    # Must match the build args above — a root container writing into the
+    # bind mount is what left out/ and dist/ root-owned and unbuildable.
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
       - .:/app
       - node_modules:/app/node_modules
+      - dev_home:/cache/home
+      - npm_cache:/cache/npm
     environment:
       - DISPLAY=${DISPLAY:-}
       - PROMPTLOOM_DISABLE_GPU=1
       - ELECTRON_DISABLE_SANDBOX=1
     tty: true
 
+  # Windows installer cross-build. Separate service (not a flag on `dev`)
+  # because it needs the much larger Wine image, which nothing else here
+  # has any use for.
+  win:
+    build:
+      context: .
+      dockerfile: Dockerfile.win
+      # Must match `user:` below — see the chown rationale in Dockerfile.win.
+      args:
+        UID: "${DOCKER_UID:-1000}"
+        GID: "${DOCKER_GID:-1000}"
+    working_dir: /app
+    init: true
+    # Must match the host user, or the dist/ output and anything else written
+    # into the bind mount lands root-owned and the host can no longer rewrite
+    # it. Defaults keep a bare `docker compose run win` working when the
+    # Makefile isn't the entry point.
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      # Wine prefix + Electron/electron-builder downloads. Without these the
+      # build re-downloads ~150MB of Electron win32 binaries and re-creates
+      # the Wine prefix on every run.
+      - win_home:/cache/home
+      - npm_cache:/cache/npm
+      - electron_cache:/cache/electron
+      - electron_builder_cache:/cache/electron-builder
+
 volumes:
   node_modules:
+  dev_home:
+  win_home:
+  npm_cache:
+  electron_cache:
+  electron_builder_cache:

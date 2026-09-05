@@ -1,4 +1,11 @@
-FROM node:22-bookworm
+# node 24 to match the runtime the app actually runs on: Electron 44 bundles
+# node 24.18.1 (`ELECTRON_RUN_AS_NODE=1 electron -p process.versions.node`),
+# and the Wine packaging image is node 24 as well. The scaffold commit pinned
+# 22 and nothing revisited it since, which left every tool here a major
+# version behind production for no stated reason — there's no `engines` field
+# asking for 22, and the README's node:sqlite note is about Electron's
+# bundled node, not this image's.
+FROM node:24-bookworm
 
 # Electron (Chromium) runtime dependencies + Xvfb for headless GUI runs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,5 +22,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-xcb1 \
     libdrm2 \
     && rm -rf /var/lib/apt/lists/*
+
+ARG UID=1000
+ARG GID=1000
+
+# node:* ships a `node` user at uid 1000, which is not necessarily the
+# host's — so own the caches by the uid this actually runs as, passed in
+# from the Makefile. Without a writable HOME, npm fails outright on any
+# command that touches the registry ("EACCES ... mkdir '/.npm'"), which is
+# every install; npm_config_cache then makes that cache a named volume so
+# `make install` isn't a cold download each time.
+# /app/node_modules is created here purely so the named volume mounted over
+# it inherits this ownership: a volume whose mount path doesn't exist in the
+# image comes up root-owned, and `npm ci` as a non-root user then dies with
+# "EACCES, rmdir '/app/node_modules/.bin'".
+RUN mkdir -p /cache/home /cache/npm /app/node_modules \
+    && chown -R ${UID}:${GID} /cache /app/node_modules
+
+ENV HOME=/cache/home \
+    npm_config_cache=/cache/npm
 
 WORKDIR /app
