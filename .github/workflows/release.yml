@@ -62,12 +62,18 @@ jobs:
   release:
     needs: check-release-tag
     if: needs.check-release-tag.outputs.tag != ''
-    runs-on: windows-latest
+    # Cross-builds the Windows installer under Wine (Dockerfile.win) rather
+    # than on a windows-latest runner — same artifact, on the cheaper SKU,
+    # and the same container path `make win` uses locally. build.yml's
+    # cosign dry run exercises the signing steps below on every PR.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       # Keyless cosign signing exchanges this job's OIDC token for a
       # short-lived Fulcio cert — no signing key ever touches the repo.
       id-token: write
+    env:
+      SERVICE: win
     steps:
       - uses: actions/checkout@v7
         with:
@@ -77,16 +83,17 @@ jobs:
           # instead of reproducing the original build byte-for-byte.
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
+      # Same single-image approach as build.yml: SERVICE=win below puts the
+      # install and bundle steps in the Wine image too, so the dev image
+      # (xvfb + Chromium runtime libs, none of it used here) is never built.
+      - name: Build Windows cross-build image
+        run: make image-win
 
       - name: Install dependencies
-        run: npm ci
+        run: make install
 
       - name: Publish (build installer + create GitHub release)
-        run: npm run publish
+        run: make publish-win
         env:
           # electron-builder's GitHub publisher reads GH_TOKEN specifically
           # (not GITHUB_TOKEN, which was electron-forge's PublisherGithub

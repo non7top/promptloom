@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.4.0](https://github.com/non7top/promptloom/compare/v4.3.0...v4.4.0) (2026-09-05)
+
+
+### Features
+
+* **ui:** find-as-you-type tag filter in the sidebar ([b531045](https://github.com/non7top/promptloom/commit/b531045aa1e0d9fed4406bba488483ef640bdfa0))
+* **ui:** find-as-you-type tag filter in the sidebar ([4daa8a0](https://github.com/non7top/promptloom/commit/4daa8a07f90d29eb04e99f77256e74b898145eb2))
+
+
+### Bug Fixes
+
+* **deps:** restore the @xmldom/xmldom bump reverted by the 4.3.0 release ([ccf07ca](https://github.com/non7top/promptloom/commit/ccf07ca09e5b2eea1d2b2dcaff9d5b81b37945ee))
+* **deps:** restore the @xmldom/xmldom bump reverted by the 4.3.0 release ([54ee6d4](https://github.com/non7top/promptloom/commit/54ee6d402dee1cdb9882ed751f2193233b7f8167))
+
 ## [4.3.0](https://github.com/non7top/promptloom/compare/v4.2.0...v4.3.0) (2026-09-03)
 
 

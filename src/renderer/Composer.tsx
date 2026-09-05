@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { Category, Item } from '../shared/types';
+import { filterByQuery } from './TagFilter';
 
 interface Props {
   categories: Category[];
   items: Item[];
   onStashChange?: (name: string) => void;
+  // Find-as-you-type query; owned by App, since the input itself lives in
+  // the sidebar header shared by this tab and Definitions.
+  filter: string;
 }
 
 function cartesianProduct(
@@ -19,7 +23,7 @@ function cartesianProduct(
   }, []);
 }
 
-export default function Composer({ categories, items, onStashChange }: Props) {
+export default function Composer({ categories, items, onStashChange, filter }: Props) {
   const [selected, setSelected] = useState<Record<number, Set<number>>>({});
   const [stashName, setStashName] = useState('');
   const [seed, setSeed] = useState('');
@@ -51,6 +55,11 @@ export default function Composer({ categories, items, onStashChange }: Props) {
   }, [categoriesWithItems, selected]);
 
   const readyToRun = categoriesWithItems.length > 0 && combinationCount > 0;
+
+  // Display-only: the run itself still spans every selected tag, including
+  // ones the current query hides. The per-category "n selected" count below
+  // is what keeps those hidden selections from being invisible.
+  const visible = filterByQuery(categoriesWithItems, items, filter);
 
   // The seed field may already hold perchance's own `(seed:::N)` syntax —
   // e.g. pasted from Gallery's "Copy seed" button — rather than a bare
@@ -123,15 +132,17 @@ export default function Composer({ categories, items, onStashChange }: Props) {
       {categoriesWithItems.length === 0 && (
         <p className="hint">Add some categories and items in Definitions first.</p>
       )}
-      {categoriesWithItems.map((category) => (
-        <section className="category" key={category.id}>
-          <header>
-            <strong>{category.name}</strong>
-          </header>
-          <ul className="item-list">
-            {items
-              .filter((item) => item.categoryId === category.id)
-              .map((item) => (
+      {visible.length === 0 && filter.trim() && <p className="hint">No tags match “{filter}”.</p>}
+      {visible.map(({ category, items: categoryItems }) => {
+        const selectedCount = selected[category.id]?.size ?? 0;
+        return (
+          <section className="category" key={category.id}>
+            <header>
+              <strong>{category.name}</strong>
+              {selectedCount > 0 && <span className="hint">{selectedCount} selected</span>}
+            </header>
+            <ul className="item-list">
+              {categoryItems.map((item) => (
                 <li key={item.id}>
                   <label>
                     <input
@@ -144,9 +155,10 @@ export default function Composer({ categories, items, onStashChange }: Props) {
                   </label>
                 </li>
               ))}
-          </ul>
-        </section>
-      ))}
+            </ul>
+          </section>
+        );
+      })}
 
       <input
         value={stashName}
