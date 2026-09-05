@@ -267,6 +267,48 @@ input {
   height: auto;
 }
 
+/* Same footprint as .tab-collapse — see the comment in App.tsx for why
+   Settings is an icon rather than a fourth equal-width tab. */
+.tabs button.tab-icon {
+  flex: none;
+  width: 2.2rem;
+  height: 1.6rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+#sidebar.sidebar-expanded .tabs button.tab-icon {
+  height: auto;
+}
+
+.settings .item-list li {
+  justify-content: space-between;
+}
+
+/* Paths are long and must not widen the sidebar; break rather than scroll,
+   since the full value is also in the title attribute. */
+.settings-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  margin: 0 0 0.4rem;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.settings-status {
+  white-space: pre-wrap;
+}
+
 .category {
   position: relative;
   border: 1px solid #c9d6ea;

@@ -3,8 +3,9 @@ import type { Category, Item } from '../shared/types';
 import DefinitionManager from './DefinitionManager';
 import Composer from './Composer';
 import Gallery from './Gallery';
+import Settings from './Settings';
 
-type Tab = 'definitions' | 'composer' | 'gallery';
+type Tab = 'definitions' | 'composer' | 'gallery' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('definitions');
@@ -69,6 +70,17 @@ export default function App() {
           <button className={tab === 'gallery' ? 'active' : ''} onClick={() => setTab('gallery')}>
             Gallery
           </button>
+          {/* Icon-sized like the collapse button rather than a fourth
+              equal-width tab: at 380px a fourth full tab leaves ~82px each
+              and "Definitions" wraps. */}
+          <button
+            className={`tab-icon${tab === 'settings' ? ' active' : ''}`}
+            title="Settings"
+            aria-label="Settings"
+            onClick={() => setTab('settings')}
+          >
+            ⚙
+          </button>
           <button
             className="tab-collapse"
             title={rightPanelCollapsed ? 'Show perchance panel' : 'Collapse right panel'}
@@ -102,6 +114,7 @@ export default function App() {
         <Composer categories={categories} items={items} onStashChange={setActiveStash} />
       </div>
       {tab === 'gallery' && <Gallery />}
+      {tab === 'settings' && <Settings />}
     </div>
   );
 }

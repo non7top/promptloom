@@ -61,7 +61,61 @@ const generations: Generation[] = [
   },
 ];
 
+// Numbers chosen to look like a real, already-migrated library so the
+// Settings tab renders meaningfully in the browser mock.
+const mockLibrary = {
+  libraryPath: 'C:\\Users\\you\\AppData\\Roaming\\PromptLoom',
+  defaultLibraryPath: 'C:\\Users\\you\\AppData\\Roaming\\PromptLoom',
+  recent: ['D:\\sprites\\promptloom'],
+  generations: 3086,
+  groups: 33,
+  imageBytes: 273_285_939,
+  dbBytes: 12_779_520,
+  freeBytes: 254_000_000_000,
+  migrated: false,
+};
+
 export const mockApi: PromptLoomApi = {
+  getLibraryInfo: async () => mockLibrary,
+  chooseLibrary: async () => null,
+  openLibrary: async () => false,
+  planMigration: async () => ({
+    dryRun: true,
+    totalRows: 3086,
+    alreadyMigrated: 0,
+    toMove: 3086,
+    missingFiles: 0,
+    groups: [
+      { label: '2026-08-31', folder: '2026-08-31', count: 552 },
+      { label: 'Unsorted', folder: 'Unsorted', count: 154 },
+    ],
+    collisions: [],
+    freeBytes: 254_000_000_000,
+    requiredBytes: 117_637_120,
+    manifestPath: null,
+    backupPath: null,
+    moved: 0,
+    errors: [],
+  }),
+  runMigration: async () => ({
+    dryRun: false,
+    totalRows: 3086,
+    alreadyMigrated: 0,
+    toMove: 3086,
+    missingFiles: 0,
+    groups: [],
+    collisions: [],
+    freeBytes: 254_000_000_000,
+    requiredBytes: 117_637_120,
+    manifestPath: 'migration-mock.jsonl',
+    backupPath: 'promptloom.backup-mock.sqlite',
+    moved: 3086,
+    errors: [],
+  }),
+  rollbackMigration: async () => ({ restored: 0, errors: [] }),
+  backupLibrary: async () => 'promptloom.backup-mock.sqlite',
+  checkIntegrity: async () => ({ ok: true, detail: 'ok' }),
+
   listCategories: async () => categories,
   createCategory: async (name) => {
     const category = { id: nextCategoryId++, name };

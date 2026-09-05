@@ -16,6 +16,15 @@ const api: PromptLoomApi = {
   exportDefinitions: () => ipcRenderer.invoke('definitions:export'),
   importDefinitions: () => ipcRenderer.invoke('definitions:import'),
 
+  getLibraryInfo: () => ipcRenderer.invoke('library:info'),
+  chooseLibrary: () => ipcRenderer.invoke('library:choose'),
+  openLibrary: (libraryPath) => ipcRenderer.invoke('library:open', libraryPath),
+  planMigration: () => ipcRenderer.invoke('library:planMigration'),
+  runMigration: () => ipcRenderer.invoke('library:migrate'),
+  rollbackMigration: () => ipcRenderer.invoke('library:rollback'),
+  backupLibrary: () => ipcRenderer.invoke('library:backup'),
+  checkIntegrity: () => ipcRenderer.invoke('library:integrity'),
+
   listGenerations: () => ipcRenderer.invoke('generations:list'),
   saveGeneration: (batchLabel, promptText, selection, seed, imageDataUrl) =>
     ipcRenderer.invoke('generations:save', batchLabel, promptText, selection, seed, imageDataUrl),

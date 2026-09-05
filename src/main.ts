@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import contextMenu from 'electron-context-menu';
 import { initDb } from './main/db';
+import { getLibraryPath, initSettings } from './main/settings';
 import { registerIpcHandlers, exportGalleryViaDialog, importGalleryViaDialog } from './main/ipc';
 import { createPerchanceView, openPerchanceDevTools, setLastPerchanceStatus } from './main/perchanceView';
 import {
@@ -164,7 +165,11 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-  initDb(app.getPath('userData'));
+  // settings.json stays in userData forever; the library it points at can
+  // live anywhere, and defaults to userData so existing installs are
+  // unaffected until someone deliberately moves them.
+  initSettings(app.getPath('userData'));
+  initDb(getLibraryPath());
   registerIpcHandlers();
   createWindow();
 });
