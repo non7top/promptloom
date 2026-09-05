@@ -176,12 +176,18 @@ export default function Gallery() {
         </div>
       )}
       {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
-      {groupByLabel(generations).map(([label, group]) => (
+      {groupByLabel(generations).map(([label, group]) => {
+        // Collapsing has to unmount the images, not just hide them: a closed
+        // <details> keeps its children in the DOM, and Blink loads and decodes
+        // images inside one regardless — so a "collapsed" stash used to cost
+        // exactly as much memory as an open one.
+        const isOpen = !collapsedLabels.has(label);
+        return (
         <details
           className="category"
           key={label}
           style={{ background: stashColor(label) }}
-          open={!collapsedLabels.has(label)}
+          open={isOpen}
           onToggle={(e) => setStashOpen(label, e.currentTarget.open)}
         >
           <summary>
@@ -240,6 +246,7 @@ export default function Gallery() {
               <button onClick={() => setConfirmingLabel(null)}>No</button>
             </div>
           )}
+          {isOpen && (
           <ul className="gallery">
             {group.map((generation) => {
               const fullText = generation.seed
@@ -258,9 +265,19 @@ export default function Gallery() {
                   key={generation.id}
                   className={generation.id === justSavedId ? 'gallery-just-saved' : undefined}
                 >
+                  {/* The Gallery renders every generation ever saved, and
+                      each src is the full-resolution PNG — so without this
+                      the renderer loads and decodes the entire library on
+                      open, and resident memory grows with the lifetime
+                      generation count (~3GB at 2k images). `aspect-ratio`
+                      in the CSS gives each one its box before it loads, so
+                      the browser can tell what's offscreen and lazy works
+                      properly rather than loading everything anyway. */}
                   <img
                     src={generation.imageUrl}
                     alt={generation.promptText}
+                    loading="lazy"
+                    decoding="async"
                     onClick={() => setZoomedUrl(generation.imageUrl)}
                   />
                   <details>
@@ -296,10 +313,11 @@ export default function Gallery() {
               );
             })}
           </ul>
+          )}
           <button className="collapse-stash" onClick={() => setStashOpen(label, false)}>
             ▲ Collapse
           </button>
-          {!collapsedLabels.has(label) && (
+          {isOpen && (
             <button
               className="collapse-side-strip"
               title="Collapse"
@@ -308,7 +326,8 @@ export default function Gallery() {
             />
           )}
         </details>
-      ))}
+        );
+      })}
       {zoomedUrl && (
         <div className="lightbox-backdrop" onClick={() => setZoomedUrl(null)}>
           <img src={zoomedUrl} alt="" />
