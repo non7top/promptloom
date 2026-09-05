@@ -41,6 +41,13 @@ jobs:
           # of this clone.
           fetch-depth: 0
 
+      # Recorded before release-please-forecast moves HEAD around, so the
+      # build below can return to exactly what was checked out here — the
+      # PR merged into master, for a pull_request event.
+      - name: Record the checked-out commit
+        id: checked_out
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       # The only image CI builds. No buildx layer cache on it deliberately:
       # it's a single chown on top of upstream's Wine image, so essentially
       # all of its cost is pulling that ~1.5GB base — which a layer cache
@@ -81,13 +88,22 @@ jobs:
 
       # The action above leaves the working tree on its own synthetic
       # preview-merge branch (or, if simulating the merge failed, on
-      # unmerged master) to compute the prediction — restore the PR's own
-      # head commit (which that action already fetched into this local
-      # branch) so the actual build below builds the PR's real changes,
-      # not whatever the action happened to leave checked out.
-      - name: Restore the PR's own head commit for the build
+      # unmerged master) to compute the prediction, so the tree has to be
+      # put back before building.
+      #
+      # Back to what actions/checkout produced, NOT to `preview-head`.
+      # preview-head is the PR branch tip *without* the base merged in, so a
+      # branch cut before some change landed on master builds without that
+      # change — which is how a PR opened before the Makefile existed failed
+      # with "make: *** No rule to make target 'win'" (promptloom#125) even
+      # though master had the Makefile. For a pull_request event
+      # actions/checkout checks out refs/pull/N/merge, i.e. the PR already
+      # merged into master, which is what should actually be built and
+      # tested. The SHA is captured rather than using github.sha so this
+      # keeps working regardless of what the forecast action does to refs.
+      - name: Restore the merge result for the build
         if: github.event_name == 'pull_request'
-        run: git checkout preview-head
+        run: git checkout ${{ steps.checked_out.outputs.sha }}
 
       - name: Compute short SHA
         id: vars

@@ -117,6 +117,26 @@ it isn't rediscovered the hard way again:
   `publish.releaseType: release` in `electron-builder.yml` (#70), plus a
   `workflow_dispatch` escape hatch in `release.yml` to backfill a release
   without waiting for a new version bump (#70, #72).
+- **Merging with the default merge-commit body double-lists every PR in the
+  changelog.** GitHub's merge commit is `Merge pull request #N from ...`
+  with the PR *title* as its body, and release-please reads a merge
+  commit's body as its effective message — so the conventional PR title is
+  counted once from the merge commit and again from the branch's own
+  conventional commit. Every entry in `CHANGELOG.md` up to v4.5.0 appears
+  twice for this reason (`ccf07ca`/`54ee6d4`, `eb433f2`/`50901b3`,
+  `9d5555e`/`d5630e1`, ...). It can't be fixed with repository settings:
+  GitHub only allows `MERGE_MESSAGE`+`PR_TITLE`, `PR_TITLE`+`PR_BODY` or
+  `PR_TITLE`+`BLANK`, and the latter two just move the conventional text
+  into the merge commit's *subject* instead. Merge with an empty body to
+  avoid it:
+
+  ```sh
+  gh pr merge <N> --merge --body ""
+  ```
+
+  In the web UI, clear the message box below the merge commit title. The
+  branch's own commits still supply the changelog entry, which is why the
+  commit-msg hook enforcing Conventional Commits matters.
 - **electron-vite is currently pinned to a beta** (`6.0.0-beta.1`) purely to
   get `vite@^8` support — the last stable release (`5.0.0`) caps at
   `vite@^7`. This is a deliberate, tracked trade-off (no dependabot ignore
