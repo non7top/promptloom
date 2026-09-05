@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import type { Category, Item } from '../shared/types';
+import { filterByQuery } from './TagFilter';
 
 interface Props {
   categories: Category[];
   items: Item[];
   onChange: () => void;
+  // Find-as-you-type query; owned by App, since the input itself lives in
+  // the sidebar header shared by this tab and Composer.
+  filter: string;
 }
 
-export default function DefinitionManager({ categories, items, onChange }: Props) {
+export default function DefinitionManager({ categories, items, onChange, filter }: Props) {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [importExportStatus, setImportExportStatus] = useState<string | null>(null);
+
+  const visible = filterByQuery(categories, items, filter);
 
   const addCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,11 +61,13 @@ export default function DefinitionManager({ categories, items, onChange }: Props
         {importExportStatus && <p className="hint">{importExportStatus}</p>}
       </div>
 
-      {categories.map((category) => (
+      {visible.length === 0 && filter.trim() && <p className="hint">No tags match “{filter}”.</p>}
+
+      {visible.map(({ category, items: categoryItems }) => (
         <CategorySection
           key={category.id}
           category={category}
-          items={items.filter((item) => item.categoryId === category.id)}
+          items={categoryItems}
           onChange={onChange}
         />
       ))}

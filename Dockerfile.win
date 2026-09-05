@@ -1,0 +1,41 @@
+# Cross-builds the Windows NSIS installer from Linux. electron-builder runs
+# NSIS (and makensis) under Wine; this image is upstream's own Wine-equipped
+# builder, which is the configuration electron-builder documents and tests
+# against, rather than a hand-rolled wine install on top of node:22.
+FROM electronuserland/builder:wine
+
+ARG UID=1000
+ARG GID=1000
+
+# A named volume takes its ownership from whatever the image holds at the
+# mount path, so these have to exist here — a volume mounted over a path the
+# image doesn't have comes up root-owned, and the build runs as the host uid.
+#
+# chown, not a world-writable mode: Wine refuses a HOME it doesn't *own*
+# ("is not owned by you, refusing to create a configuration directory
+# there") rather than merely one it can't write, so mode 1777 gets as far as
+# producing the installer and then dies building the uninstaller — that step
+# runs the freshly-built .exe under Wine. That's what makes this image
+# uid-specific, so the Makefile passes the host's uid/gid both as build args
+# and as the container user, keeping the two in lockstep.
+#
+# HOME is a volume for speed, not just writability: Wine initialises its
+# prefix at $HOME/.wine on first use, and re-doing that every run is ~15s.
+# /app/node_modules is here for the same reason as in Dockerfile.dev: it
+# shares that named volume, and whichever image creates the volume first
+# sets its ownership.
+RUN mkdir -p /cache/home /cache/npm /cache/electron /cache/electron-builder /app/node_modules \
+    && chown -R ${UID}:${GID} /cache /app/node_modules
+
+# Silences Wine's debug channels. Measured over 3 runs each, warm caches:
+# 64/62/64s without it, 60/61/60s with — a consistent ~3s (4.7%), with the
+# two ranges not overlapping. Small, but free, and it keeps the build log
+# readable. Not a lever on CI time: the job's dominant cost is the ~96s
+# image pull, not the build itself.
+ENV WINEDEBUG=-all \
+    HOME=/cache/home \
+    npm_config_cache=/cache/npm \
+    ELECTRON_CACHE=/cache/electron \
+    ELECTRON_BUILDER_CACHE=/cache/electron-builder
+
+WORKDIR /app

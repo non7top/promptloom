@@ -4,6 +4,7 @@ import DefinitionManager from './DefinitionManager';
 import Composer from './Composer';
 import Gallery from './Gallery';
 import Settings from './Settings';
+import TagFilter, { countItems, filterByQuery } from './TagFilter';
 
 type Tab = 'definitions' | 'composer' | 'gallery' | 'settings';
 
@@ -13,6 +14,10 @@ export default function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [activeStash, setActiveStash] = useState('');
+  // Owned here rather than per-tab: the input sits in the sticky header, and
+  // both Definitions and Composer list the same tags, so a query typed while
+  // picking tags survives a hop over to Definitions to edit one of them.
+  const [tagFilter, setTagFilter] = useState('');
 
   const reload = async () => {
     const [nextCategories, nextItems] = await Promise.all([
@@ -103,15 +108,37 @@ export default function App() {
             placeholder="Unsorted"
           />
         </div>
+        {/* Only the tag-listing tabs. Named explicitly rather than excluding
+            Gallery: this was `tab !== 'gallery'` when there were three tabs,
+            and adding Settings silently opted it in to a tab that lists no
+            tags at all. */}
+        {(tab === 'definitions' || tab === 'composer') && items.length > 0 && (
+          <TagFilter
+            value={tagFilter}
+            onChange={setTagFilter}
+            matchCount={countItems(filterByQuery(categories, items, tagFilter))}
+            totalCount={items.length}
+          />
+        )}
       </div>
       {tab === 'definitions' && (
-        <DefinitionManager categories={categories} items={items} onChange={reload} />
+        <DefinitionManager
+          categories={categories}
+          items={items}
+          onChange={reload}
+          filter={tagFilter}
+        />
       )}
       {/* Kept mounted (rather than conditionally rendered like the other
           tabs) so switching away and back doesn't lose the in-progress
           checkbox selection, seed, or running combo. */}
       <div style={{ display: tab === 'composer' ? 'block' : 'none' }}>
-        <Composer categories={categories} items={items} onStashChange={setActiveStash} />
+        <Composer
+          categories={categories}
+          items={items}
+          onStashChange={setActiveStash}
+          filter={tagFilter}
+        />
       </div>
       {tab === 'gallery' && <Gallery />}
       {tab === 'settings' && <Settings />}
