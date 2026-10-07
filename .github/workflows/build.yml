@@ -175,15 +175,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           LABEL_SUFFIX="${{ steps.artifact_names.outputs.version_tag || steps.vars.outputs.sha_short }}"
-          marker='<!-- windows-build -->'
-          body="${marker}
-          Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`:
+          gh pr comment "${{ github.event.pull_request.number }}" --body "Windows build ready for \`${{ steps.vars.outputs.sha_short }}\`:
           - [promptloom-installer-${LABEL_SUFFIX}](${{ steps.upload-installer.outputs.artifact-url }})"
-          # Update one comment in place instead of adding one per push.
-          id=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"${marker}\")) | .id] | last // empty")
-          if [ -n "$id" ]; then
-            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/${id}" -f body="$body"
-          else
-            gh pr comment "${{ github.event.pull_request.number }}" --body "$body"
-          fi
