@@ -4,6 +4,7 @@
 // (it just patches the packaged Electron binary), so nothing here is tied
 // to electron-builder either — this is the documented way to use it from
 // any packager's post-pack hook.
+const fs = require('node:fs');
 const path = require('node:path');
 
 exports.default = async function afterPack(context) {
@@ -28,4 +29,24 @@ exports.default = async function afterPack(context) {
     [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
     [FuseV1Options.OnlyLoadAppFromAsar]: true,
   });
+
+  if (electronPlatformName === 'win32') {
+    await embedProvenanceRepo(electronBinaryPath, packager.config.publish);
+  }
 };
+
+// sigstore-shell reads this to know which repo's attestations to look up for
+// the file. It is only a hint; the verifier trusts the attestation's
+// certificate, not this string.
+async function embedProvenanceRepo(exePath, publish) {
+  const { owner, repo } = publish;
+  const { NtExecutable, NtExecutableResource, Resource } = require('resedit');
+  const executable = NtExecutable.from(fs.readFileSync(exePath));
+  const resources = NtExecutableResource.from(executable);
+  const [versionInfo] = Resource.VersionInfo.fromEntries(resources.entries);
+  const [language] = versionInfo.getAllLanguagesForStringValues();
+  versionInfo.setStringValues(language, { ProvenanceRepo: `${owner}/${repo}` });
+  versionInfo.outputToResourceEntries(resources.entries);
+  resources.outputResource(executable);
+  fs.writeFileSync(exePath, Buffer.from(executable.generate()));
+}
