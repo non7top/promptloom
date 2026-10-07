@@ -39,6 +39,7 @@ export default function Gallery() {
   const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
   const galleryStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [query, setQuery] = useState('');
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -168,15 +169,41 @@ export default function Gallery() {
     });
   };
 
+  const needle = query.trim().toLowerCase();
+  const visibleGenerations = needle
+    ? generations.filter((g) => `${g.promptText} ${g.seed ?? ''}`.toLowerCase().includes(needle))
+    : generations;
+
   return (
     <div>
+      <div className="gallery-toolbar">
+        <input
+          type="search"
+          className="gallery-search"
+          placeholder="Search prompts…"
+          aria-label="Search prompts"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setQuery('');
+          }}
+        />
+        {needle && (
+          <span className="hint">
+            {visibleGenerations.length} of {generations.length}
+          </span>
+        )}
+      </div>
       {galleryStatus && (
         <div className="gallery-toolbar">
           <span className="hint">{galleryStatus}</span>
         </div>
       )}
       {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
-      {groupByLabel(generations).map(([label, group]) => {
+      {generations.length > 0 && visibleGenerations.length === 0 && (
+        <p className="hint">No prompts match “{query.trim()}”.</p>
+      )}
+      {groupByLabel(visibleGenerations).map(([label, group]) => {
         // Collapsing has to unmount the images, not just hide them: a closed
         // <details> keeps its children in the DOM, and Blink loads and decodes
         // images inside one regardless — so a "collapsed" stash used to cost
