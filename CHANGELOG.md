@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.6.0](https://github.com/non7top/promptloom/compare/v4.5.0...v4.6.0) (2026-10-07)
+
+
+### Features
+
+* add find-as-you-type search to gallery prompts ([9d5f3c2](https://github.com/non7top/promptloom/commit/9d5f3c2e5fa3437fdf93fc9598192c6367b63696))
+* add find-as-you-type search to gallery prompts ([78fe96d](https://github.com/non7top/promptloom/commit/78fe96d6f1a6b805833c582dcbf7c3717c523540))
+* **release:** embed ProvenanceRepo in the exes and attest them ([6740472](https://github.com/non7top/promptloom/commit/6740472db19095d7fc23e65cf89ba206034ba546))
+* **release:** embed ProvenanceRepo in the exes and attest them ([4b782c3](https://github.com/non7top/promptloom/commit/4b782c3cda77f708d5da406ca6de2c007fcff23c))
+
 ## [4.5.0](https://github.com/non7top/promptloom/compare/v4.4.0...v4.5.0) (2026-09-05)
 
 
