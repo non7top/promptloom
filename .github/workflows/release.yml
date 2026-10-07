@@ -72,6 +72,7 @@ jobs:
       # Keyless cosign signing exchanges this job's OIDC token for a
       # short-lived Fulcio cert — no signing key ever touches the repo.
       id-token: write
+      attestations: write
     env:
       SERVICE: win
     steps:
@@ -100,6 +101,17 @@ jobs:
           # convention) — set both since nothing else here reads either.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Attests both the installer and the exe it installs (a different hash),
+      # so the digest of either file finds its provenance on GitHub. Must run
+      # on the final bytes: anything that rewrites a file afterwards changes
+      # its hash and orphans the attestation.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/win-unpacked/PromptLoom.exe
 
       - uses: sigstore/cosign-installer@v4.1.2
 

@@ -166,3 +166,19 @@ Not covered: Authenticode signing. Releases are signed with cosign
 (sigstore) over the finished `.exe`, so there's no `signtool` certificate in
 play — a real code-signing cert would need its own look at whether Wine's
 `signtool` is up to it.
+
+### Verifying where a release came from
+
+Each release's installer and the `PromptLoom.exe` it installs carry a
+`ProvenanceRepo` string (`non7top/promptloom`) in their version resource,
+and both are attested by the release workflow
+(`actions/attest-build-provenance`), so GitHub holds a Sigstore-signed
+provenance record keyed by each file's SHA-256 digest. To check a download:
+
+```sh
+gh attestation verify PromptLoom-Setup-<version>.exe --repo non7top/promptloom
+```
+
+The string only says where to look; the attestation's certificate is what
+proves which repo and workflow built the file. The installer also has a
+detached cosign bundle on the release, for `cosign verify-blob`.
