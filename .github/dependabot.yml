@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     # "chore" for both — a dependency bump isn't reliably just a "fix"
     # (could carry breaking changes or capability we now rely on), and
     # there's no static way to have Dependabot self-report severity. A
@@ -16,6 +16,6 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: "chore"
