@@ -43,12 +43,21 @@ export function countItems(entries: FilteredCategory[]): number {
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  matchCount: number;
-  totalCount: number;
+  matchCount?: number;
+  totalCount?: number;
+  placeholder?: string;
+  label?: string;
 }
 
-export default function TagFilter({ value, onChange, matchCount, totalCount }: Props) {
-  const active = value.trim().length > 0;
+export default function TagFilter({
+  value,
+  onChange,
+  matchCount,
+  totalCount,
+  placeholder = 'Find tag…',
+  label = 'Find tag',
+}: Props) {
+  const active = value.trim().length > 0 && matchCount !== undefined && totalCount !== undefined;
   return (
     <div className="tag-filter">
       {/* type="search" for Chromium's built-in clear affordance; Escape
@@ -61,8 +70,8 @@ export default function TagFilter({ value, onChange, matchCount, totalCount }: P
         onKeyDown={(e) => {
           if (e.key === 'Escape') onChange('');
         }}
-        placeholder="Find tag…"
-        aria-label="Find tag"
+        placeholder={placeholder}
+        aria-label={label}
       />
       {active && (
         <span className="hint">

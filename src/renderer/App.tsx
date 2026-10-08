@@ -18,6 +18,9 @@ export default function App() {
   // both Definitions and Composer list the same tags, so a query typed while
   // picking tags survives a hop over to Definitions to edit one of them.
   const [tagFilter, setTagFilter] = useState('');
+  // Same reason as tagFilter: the Gallery search sits in the sticky header so
+  // it stays put while the gallery scrolls.
+  const [galleryQuery, setGalleryQuery] = useState('');
 
   const reload = async () => {
     const [nextCategories, nextItems] = await Promise.all([
@@ -120,6 +123,14 @@ export default function App() {
             totalCount={items.length}
           />
         )}
+        {tab === 'gallery' && (
+          <TagFilter
+            value={galleryQuery}
+            onChange={setGalleryQuery}
+            placeholder="Search prompts…"
+            label="Search prompts"
+          />
+        )}
       </div>
       {tab === 'definitions' && (
         <DefinitionManager
@@ -140,7 +151,7 @@ export default function App() {
           filter={tagFilter}
         />
       </div>
-      {tab === 'gallery' && <Gallery />}
+      {tab === 'gallery' && <Gallery query={galleryQuery} />}
       {tab === 'settings' && <Settings />}
     </div>
   );

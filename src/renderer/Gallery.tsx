@@ -26,7 +26,7 @@ function groupByLabel(generations: Generation[]): [string, Generation[]][] {
   return Array.from(groups.entries());
 }
 
-export default function Gallery() {
+export default function Gallery({ query }: { query: string }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [confirmingLabel, setConfirmingLabel] = useState<string | null>(null);
   const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
@@ -39,7 +39,6 @@ export default function Gallery() {
   const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
   const galleryStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [query, setQuery] = useState('');
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -176,24 +175,6 @@ export default function Gallery() {
 
   return (
     <div>
-      <div className="gallery-toolbar">
-        <input
-          type="search"
-          className="gallery-search"
-          placeholder="Search prompts…"
-          aria-label="Search prompts"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setQuery('');
-          }}
-        />
-        {needle && (
-          <span className="hint">
-            {visibleGenerations.length} of {generations.length}
-          </span>
-        )}
-      </div>
       {galleryStatus && (
         <div className="gallery-toolbar">
           <span className="hint">{galleryStatus}</span>
@@ -202,6 +183,11 @@ export default function Gallery() {
       {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
       {generations.length > 0 && visibleGenerations.length === 0 && (
         <p className="hint">No prompts match “{query.trim()}”.</p>
+      )}
+      {needle && visibleGenerations.length > 0 && (
+        <p className="hint">
+          {visibleGenerations.length} of {generations.length}
+        </p>
       )}
       {groupByLabel(visibleGenerations).map(([label, group]) => {
         // Collapsing has to unmount the images, not just hide them: a closed
