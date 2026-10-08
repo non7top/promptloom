@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.6.1](https://github.com/non7top/promptloom/compare/v4.6.0...v4.6.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **gallery:** pin the search box in the sticky header ([fd2ae0a](https://github.com/non7top/promptloom/commit/fd2ae0af8185b397a98ee2eb685d8388e18696b3))
+* **gallery:** pin the search box in the sticky header ([8281157](https://github.com/non7top/promptloom/commit/82811574a34ff62132969083e14fe6637aaf2280))
+
 ## [4.6.0](https://github.com/non7top/promptloom/compare/v4.5.0...v4.6.0) (2026-10-07)
 
 
