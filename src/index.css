@@ -440,11 +440,6 @@ input {
   margin-bottom: 0.75rem;
 }
 
-.gallery-search {
-  flex: 1;
-  min-width: 12rem;
-}
-
 .gallery-toolbar .hint {
   margin: 0;
 }
