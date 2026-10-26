@@ -370,42 +370,90 @@ const INJECT_GALLERY_SAVE_SCRIPT = `
       const imageId = tile.dataset.imageId;
       // Tile may have scrolled out and been pruned from the DOM since it
       // was queued — nothing to attach a button/badge to in that case.
-      if (!imageId || !document.body.contains(tile)) continue;
+      if (!imageId || !document.body.contains(tile)) {
+        tile.__promptloomPending = false;
+        tile.__promptloomImageId = null;
+        continue;
+      }
+      // Recycled for another image while queued: attach() has re-queued it.
+      if (tile.__promptloomImageId !== imageId) {
+        tile.__promptloomPending = false;
+        continue;
+      }
       if (window.__promptloomGallerySavedIds.has(imageId)) {
+        tile.__promptloomSaved = true;
+        tile.__promptloomPending = false;
         markSaved(tile);
         continue;
       }
       try {
         const img = tile.querySelector('.imageWrapperInner img');
         const imageUrl = img && img.src;
+        // Bounded so one check that never answers can't leave the queue
+        // flagged as running, which would stop every later tile from
+        // getting either a button or a badge.
         const matched = imageUrl
-          ? await window.promptloomBridge.checkGallerySaved(imageId, tile.dataset.prompt || '', imageUrl)
+          ? await Promise.race([
+              window.promptloomBridge.checkGallerySaved(imageId, tile.dataset.prompt || '', imageUrl),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('check timed out')), 15000)),
+            ])
           : false;
+        // The tile may have been recycled during the await.
+        if (tile.dataset.imageId !== imageId) {
+          tile.__promptloomPending = false;
+          continue;
+        }
+        tile.__promptloomPending = false;
         if (matched) {
           window.__promptloomGallerySavedIds.add(imageId);
+          tile.__promptloomSaved = true;
           markSaved(tile);
         } else {
           attachSaveButton(tile);
         }
       } catch (err) {
         console.error('[PromptLoom] gallery save-state check failed', err);
+        tile.__promptloomPending = false;
         attachSaveButton(tile); // fail open — a spurious button beats a tile stuck with neither.
       }
     }
     window.__promptloomGalleryQueueRunning = false;
   }
 
+  // Perchance re-renders tile contents and recycles tile elements for new
+  // images as the gallery live-loads, which drops our button/badge (or
+  // leaves them on a tile that now shows a different image). Hence the
+  // per-tile record is keyed by image id and the decorations are rebuilt
+  // whenever they are missing or stale.
+  function resetTile(tile) {
+    tile.querySelectorAll('.' + BUTTON_CLASS + ', .' + SAVED_CLASS).forEach((el) => el.remove());
+    tile.style.outline = '';
+  }
+
   function attach(tile) {
     const imageId = tile.dataset.imageId;
-    if (!imageId || tile.__promptloomChecked) return;
-    if (tile.querySelector('.' + BUTTON_CLASS) || tile.querySelector('.' + SAVED_CLASS)) return;
+    if (!imageId) return;
+    const decorated = tile.querySelector('.' + BUTTON_CLASS) || tile.querySelector('.' + SAVED_CLASS);
+    if (tile.__promptloomImageId === imageId) {
+      if (decorated || tile.__promptloomPending) return;
+      // Same image, decoration wiped by a re-render: restore from the
+      // earlier answer instead of re-fetching and re-hashing.
+      if (tile.__promptloomSaved || window.__promptloomGallerySavedIds.has(imageId)) markSaved(tile);
+      else attachSaveButton(tile);
+      return;
+    }
+    // New image on this element (or first sight of it).
+    resetTile(tile);
+    tile.__promptloomImageId = imageId;
+    tile.__promptloomSaved = false;
     // Already confirmed saved this session (e.g. by clicking its own
     // button) — no need to round-trip through the queue for that.
     if (window.__promptloomGallerySavedIds.has(imageId)) {
+      tile.__promptloomSaved = true;
       markSaved(tile);
       return;
     }
-    tile.__promptloomChecked = true;
+    tile.__promptloomPending = true;
     window.__promptloomGalleryCheckQueue.push(tile);
     runQueue();
   }
@@ -417,7 +465,7 @@ const INJECT_GALLERY_SAVE_SCRIPT = `
   scan();
   if (window.__promptloomGalleryScanInterval) return;
   // The gallery loads more tiles on scroll, so keep re-scanning rather than
-  // attaching once. tile.__promptloomChecked keeps this from re-queuing
+  // attaching once. tile.__promptloomImageId keeps this from re-queuing
   // (and re-fetching/re-hashing) the same still-present tile every tick.
   window.__promptloomGalleryScanInterval = setInterval(scan, 1000);
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
@@ -428,6 +476,146 @@ export async function injectGallerySaveButtons(): Promise<void> {
   const frame = await findFrameWithSelector(GALLERY_TILE_SELECTOR);
   if (!frame) return; // Not fatal — the gallery tab may not be open yet; retried on the next frame load.
   await frame.executeJavaScript(INJECT_GALLERY_SAVE_SCRIPT);
+}
+
+// The Favorites view is a separate component (#localMediaGallery_root, a bare
+// div > div > img with no classes or data-* ids). Its images are blob: URLs
+// owned by the page, which the main process can't fetch, so the bytes are
+// read here and sent as a data URL through the same bridge call the
+// generator's own save button uses. There is no stable per-image id, so
+// "already saved" is decided by content: the page hashes the bytes and the
+// main process compares against the saved library (ipc.ts's
+// perchance:checkImageHashSaved).
+const FAVORITES_ROOT_SELECTOR = '#localMediaGallery_root';
+const INJECT_FAVORITES_SAVE_SCRIPT = `
+(() => {
+  window.__promptloomFavoritesSavedSrcs = window.__promptloomFavoritesSavedSrcs || new Set();
+  // Blob URLs already sent for a hash check, so a still-present tile isn't
+  // re-hashed every scan tick. Matches only ever flip a tile to saved.
+  window.__promptloomFavoritesCheckedSrcs = window.__promptloomFavoritesCheckedSrcs || new Set();
+  const checkQueue = [];
+  let queueRunning = false;
+  const BUTTON_CLASS = 'promptloom-favorites-save-btn';
+  const SAVED_CLASS = 'promptloom-favorites-saved-badge';
+  const root = () => document.querySelector(${JSON.stringify(FAVORITES_ROOT_SELECTOR)});
+
+  // Nothing known about where Favorites keeps the prompt/seed, so look for
+  // data-prompt/data-seed on the image or any ancestor up to the root.
+  function readMeta(img) {
+    let prompt = '';
+    let seed = null;
+    for (let el = img; el && el !== root().parentElement; el = el.parentElement) {
+      prompt = prompt || el.dataset.prompt || '';
+      seed = seed || el.dataset.seed || null;
+    }
+    return { prompt: prompt || img.alt || img.title || '', seed };
+  }
+
+  function toDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function clear(tile) {
+    tile.querySelectorAll('.' + BUTTON_CLASS + ', .' + SAVED_CLASS).forEach((el) => el.remove());
+    tile.style.outline = '';
+  }
+
+  // One at a time: each check reads and hashes a whole image.
+  async function runQueue() {
+    if (queueRunning) return;
+    queueRunning = true;
+    while (checkQueue.length) {
+      const { tile, img, src } = checkQueue.shift();
+      try {
+        const buffer = await (await fetch(src)).arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', buffer);
+        const hash = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+        if (await window.promptloomBridge.checkImageHashSaved(hash, buffer.byteLength)) {
+          window.__promptloomFavoritesSavedSrcs.add(src);
+          if (document.body.contains(tile) && img.src === src) {
+            clear(tile);
+            decorate(tile, img);
+          }
+        }
+      } catch (err) {
+        console.error('[PromptLoom] favorites save-state check failed', err);
+      }
+    }
+    queueRunning = false;
+  }
+
+  function decorate(tile, img) {
+    if (getComputedStyle(tile).position === 'static') tile.style.position = 'relative';
+    const saved = window.__promptloomFavoritesSavedSrcs.has(img.src);
+    const el = document.createElement(saved ? 'div' : 'button');
+    el.className = saved ? SAVED_CLASS : BUTTON_CLASS;
+    el.dataset.src = img.src;
+    // Same outline as the community-gallery tiles: the badge alone is too
+    // small to spot when scanning a full page.
+    if (saved) tile.style.outline = '5px solid #2ecc71';
+    el.textContent = saved ? '✓ Saved' : '💾 Save';
+    el.style.cssText =
+      'position:absolute; top:4px; left:4px; z-index:9999;' +
+      (saved
+        ? 'pointer-events:none; background:#2ecc71; color:#fff; font:bold 11px sans-serif;' +
+          'padding:2px 6px; border-radius:4px;'
+        : 'cursor:pointer; background:rgba(0,0,0,0.72); color:#fff; border:1px solid #fff;' +
+          'border-radius:4px; padding:2px 6px; font:bold 11px sans-serif;');
+    if (!saved) {
+      el.title = 'Save to PromptLoom';
+      el.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          const src = img.src;
+          const dataUrl = await toDataUrl(await (await fetch(src)).blob());
+          const meta = readMeta(img);
+          window.promptloomBridge.saveImage(dataUrl, meta.prompt, meta.seed);
+          window.__promptloomFavoritesSavedSrcs.add(src);
+          clear(tile);
+          decorate(tile, img);
+        } catch (err) {
+          console.error('[PromptLoom] failed to save favorite', err);
+        }
+      });
+    }
+    tile.appendChild(el);
+    if (!saved && !window.__promptloomFavoritesCheckedSrcs.has(img.src)) {
+      window.__promptloomFavoritesCheckedSrcs.add(img.src);
+      checkQueue.push({ tile, img, src: img.src });
+      runQueue();
+    }
+  }
+
+  function scan() {
+    const r = root();
+    if (!r) return;
+    r.querySelectorAll('img[src^="blob:"]').forEach((img) => {
+      const tile = img.parentElement;
+      if (!tile) return;
+      const existing = tile.querySelector('.' + BUTTON_CLASS + ', .' + SAVED_CLASS);
+      // Tile element reused for a different image: its old decoration is stale.
+      if (existing && existing.dataset.src === img.src) return;
+      clear(tile);
+      decorate(tile, img);
+    });
+  }
+
+  scan();
+  if (window.__promptloomFavoritesScanInterval) return;
+  window.__promptloomFavoritesScanInterval = setInterval(scan, 1000);
+})();
+`;
+
+export async function injectFavoritesSaveButtons(): Promise<void> {
+  const frame = await findFrameWithSelector(FAVORITES_ROOT_SELECTOR);
+  if (!frame) return; // Not fatal — Favorites may not be open yet; retried on the next frame load.
+  await frame.executeJavaScript(INJECT_FAVORITES_SAVE_SCRIPT);
 }
 
 export async function injectSaveButtons(): Promise<void> {

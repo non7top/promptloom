@@ -323,4 +323,31 @@ export function registerIpcHandlers(): void {
       return false;
     },
   );
+
+  // Answers the Favorites tiles' "already saved?" check by content. File
+  // hashes are cached per path (saved images never change), and only files
+  // of the same byte length are hashed, so the first call doesn't read the
+  // whole library.
+  const hashByPath = new Map<string, string>();
+  ipcMain.handle(
+    'perchance:checkImageHashSaved',
+    async (_event, sha256: string, byteLength: number): Promise<boolean> => {
+      for (const generation of db.listGenerations()) {
+        try {
+          let hash = hashByPath.get(generation.imagePath);
+          if (!hash) {
+            if ((await fs.promises.stat(generation.imagePath)).size !== byteLength) continue;
+            hash = createHash('sha256')
+              .update(await fs.promises.readFile(generation.imagePath))
+              .digest('hex');
+            hashByPath.set(generation.imagePath, hash);
+          }
+          if (hash === sha256) return true;
+        } catch {
+          // The file may have been deleted since it was listed.
+        }
+      }
+      return false;
+    },
+  );
 }
