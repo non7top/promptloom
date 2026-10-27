@@ -11,6 +11,7 @@ import {
   injectSaveButtons,
   injectShapeListSelect,
   injectGallerySaveButtons,
+  injectFavoritesSaveButtons,
 } from './main/perchanceDriver';
 import type { PerchanceStatus } from './shared/types';
 
@@ -151,6 +152,7 @@ const createWindow = () => {
     injectSaveButtons();
     injectShapeListSelect();
     injectGallerySaveButtons();
+    injectFavoritesSaveButtons();
   });
   perchanceView.webContents.on('did-fail-load', (_event, _code, errorDescription, _url, isMainFrame) => {
     // did-fail-load fires for any failed resource (ads, trackers, fonts,

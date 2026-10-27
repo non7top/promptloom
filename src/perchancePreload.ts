@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('promptloomBridge', {
   // Save button or the ✓ Saved badge for a given tile.
   checkGallerySaved: (imageId: string, prompt: string, imageUrl: string): Promise<boolean> =>
     ipcRenderer.invoke('perchance:checkGallerySaved', imageId, prompt, imageUrl),
+  // Favorites tiles have no id or remote URL, only bytes: the page hashes
+  // them and the main process matches that against the saved library.
+  checkImageHashSaved: (sha256: string, byteLength: number): Promise<boolean> =>
+    ipcRenderer.invoke('perchance:checkImageHashSaved', sha256, byteLength),
 });
 
 // Confirms in DevTools whether this preload is actually running in a given
