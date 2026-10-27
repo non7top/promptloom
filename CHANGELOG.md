@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.6.2](https://github.com/non7top/promptloom/compare/v4.6.1...v4.6.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* **gallery:** keep save buttons across reloads and add them to favorites ([cc8f2e3](https://github.com/non7top/promptloom/commit/cc8f2e39331d64424a453ad1bbc85146655711e5))
+* **gallery:** keep save buttons across reloads and add them to favorites ([a68fcbb](https://github.com/non7top/promptloom/commit/a68fcbbe92716af49fd9c7d8fe23a324a2aa84f9))
+
 ## [4.6.1](https://github.com/non7top/promptloom/compare/v4.6.0...v4.6.1) (2026-10-08)
 
 
