@@ -23,12 +23,13 @@ import {
   toStoredPath,
   freeSpaceBytes,
   labelToRelDir,
+  type GenerationRow,
 } from './storage';
 
 let db: DatabaseSync;
 let imagesDir: string;
 // Root of the active library. Every stored image_path is relative to this
-// (older rows are still absolute — see resolveImagePath), which is what lets
+// (older rows are still absolute - see resolveImagePath), which is what lets
 // a library be moved to another disk or machine and still open.
 let libraryRoot: string;
 
@@ -46,7 +47,7 @@ export function initDb(libraryPath: string): void {
   db = new DatabaseSync(path.join(libraryPath, 'promptloom.sqlite'));
   db.exec('PRAGMA foreign_keys = ON;');
   // WAL survives an abrupt process death far better than the default
-  // rollback journal, and lets reads continue during a write — which
+  // rollback journal, and lets reads continue during a write - which
   // matters here because saves arrive from perchance while the Gallery is
   // reading. NORMAL is the standard pairing with WAL: it only gives up
   // durability for the last transaction on an OS-level crash, not on an
@@ -72,18 +73,26 @@ export function initDb(libraryPath: string): void {
       seed TEXT,
       image_path TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      source_gallery_id TEXT
+      source_gallery_id TEXT,
+      score INTEGER,
+      category TEXT
     );
   `);
 
   // CREATE TABLE IF NOT EXISTS above is a no-op for an existing install's
-  // generations table, which predates source_gallery_id — add it explicitly
+  // generations table, which predates source_gallery_id - add it explicitly
   // when missing instead of assuming every install already has it.
   const generationsColumns = db.prepare('PRAGMA table_info(generations)').all() as {
     name: string;
   }[];
   if (!generationsColumns.some((column) => column.name === 'source_gallery_id')) {
     db.exec('ALTER TABLE generations ADD COLUMN source_gallery_id TEXT;');
+  }
+  if (!generationsColumns.some((column) => column.name === 'score')) {
+    db.exec('ALTER TABLE generations ADD COLUMN score INTEGER;');
+  }
+  if (!generationsColumns.some((column) => column.name === 'category')) {
+    db.exec('ALTER TABLE generations ADD COLUMN category TEXT;');
   }
   // Backs both halves of the perchance-gallery "already saved?" check
   // (perchanceDriver.ts's injected script, via ipc.ts's
@@ -94,6 +103,8 @@ export function initDb(libraryPath: string): void {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_generations_source_gallery_id ON generations(source_gallery_id);
     CREATE INDEX IF NOT EXISTS idx_generations_prompt_text ON generations(prompt_text);
+    CREATE INDEX IF NOT EXISTS idx_generations_score ON generations(score);
+    CREATE INDEX IF NOT EXISTS idx_generations_category ON generations(category);
   `);
 
   // Still created: it stays the home for anything not yet migrated into
@@ -103,7 +114,7 @@ export function initDb(libraryPath: string): void {
   fs.mkdirSync(stashesDir(libraryPath), { recursive: true });
 }
 
-// A .sqlite file written by SQLite itself rather than a dump — restoring is
+// A .sqlite file written by SQLite itself rather than a dump - restoring is
 // a file copy. VACUUM INTO takes a consistent snapshot without blocking
 // writers, so this is safe to run while the app is in use.
 export function backupLibrary(): string {
@@ -136,7 +147,7 @@ export function libraryStats(defaultLibraryPath: string, recent: string[]): Libr
     try {
       imageBytes += fs.statSync(absolute).size;
     } catch {
-      // Counted as zero rather than failing the whole stat sweep — a
+      // Counted as zero rather than failing the whole stat sweep - a
       // missing file is what the migration's own report is for.
     }
   }
@@ -212,7 +223,7 @@ export function deleteItem(id: number): void {
 // Same `// Category:Item` comment format Composer.tsx puts ahead of each
 // fragment in the populated prompt, so a stash's saved prompts already
 // double as documentation of how to reconstruct the definitions that
-// produced them — export/import just reuses that format directly rather
+// produced them - export/import just reuses that format directly rather
 // than inventing a separate one.
 export function exportDefinitionsText(): string {
   const categoryNameById = new Map(listCategories().map((category) => [category.id, category.name]));
@@ -296,7 +307,7 @@ export function importDefinitionsText(text: string): DefinitionsImportResult {
 export function listGenerations(): Generation[] {
   const rows = db
     .prepare(
-      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at FROM generations ORDER BY id DESC',
+      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at, score, category FROM generations ORDER BY id DESC',
     )
     .all() as {
     id: number;
@@ -306,6 +317,8 @@ export function listGenerations(): Generation[] {
     seed: string | null;
     image_path: string;
     created_at: string;
+    score: number | null;
+    category: string | null;
   }[];
   return rows.map((row) => ({
     id: row.id,
@@ -316,6 +329,8 @@ export function listGenerations(): Generation[] {
     imagePath: resolveImagePath(libraryRoot, row.image_path),
     imageUrl: pathToFileURL(resolveImagePath(libraryRoot, row.image_path)).href,
     createdAt: row.created_at,
+    score: row.score !== null && row.score !== undefined ? Number(row.score) : null,
+    category: row.category ?? null,
   }));
 }
 
@@ -330,7 +345,7 @@ export function sidecarText(promptText: string, seed: string | null, createdAt: 
   return `Prompt: ${promptText}\nSeed: ${seed ? `(seed:::${seed})` : 'unknown'}\nCreated: ${createdAt}\n`;
 }
 
-// Random names, not sequential IDs — a stash folder can end up with
+// Random names, not sequential IDs - a stash folder can end up with
 // millions of these, and there's no reason to expose (or rely on) the DB's
 // row order in the filename. Shared by saveGeneration (renderer capture, a
 // data URL) and importGalleryZip (a zip entry, already raw bytes).
@@ -379,7 +394,7 @@ export function saveGeneration(
   seed: string | null,
   imageDataUrl: string,
   // Set only when this came from perchance's own community gallery (see
-  // ipc.ts's perchance:saveImageFromUrl) — populates the fast path for
+  // ipc.ts's perchance:saveImageFromUrl) - populates the fast path for
   // findGenerationBySourceGalleryId below. Every other caller (Composer's
   // own saves, the generator's own save button, zip imports) leaves it
   // null, since there's no such external ID to record.
@@ -395,7 +410,7 @@ export function saveGeneration(
 
   // Extension follows the data URL's own mime subtype rather than being
   // hardcoded, since callers other than perchance's own (PNG) save button
-  // — e.g. saving a JPEG straight from the community gallery — pass through
+  // - e.g. saving a JPEG straight from the community gallery - pass through
   // whatever format the source actually was.
   const match = /^data:image\/(\w+);base64,(.+)$/.exec(imageDataUrl);
   const ext = match?.[1] || 'png';
@@ -425,7 +440,7 @@ export function saveGeneration(
   };
 }
 
-// Fast path for "has this perchance gallery image already been saved?" —
+// Fast path for "has this perchance gallery image already been saved?" -
 // a direct indexed lookup, no network/hashing needed. See
 // findGenerationsByPromptText below for the slow-path fallback this misses
 // (anything saved before source_gallery_id existed, or via the generator's
@@ -440,7 +455,7 @@ export function findGenerationBySourceGalleryId(sourceGalleryId: string): boolea
 // Slow-path candidates for the same check: an exact prompt_text match is a
 // strong signal on its own (perchance's gallery prompts are long and
 // boilerplate-heavy, rarely identical by coincidence), but not proof by
-// itself — a "custom" save via the generator's own save button can and does
+// itself - a "custom" save via the generator's own save button can and does
 // reuse identical prompt text across genuinely different images (same
 // prompt, different seed), so the caller still needs to content-hash-
 // compare each candidate's actual bytes against the gallery image's.
@@ -458,7 +473,7 @@ export function setSourceGalleryId(id: number, sourceGalleryId: string): void {
 }
 
 // A stash label can contain characters that aren't safe as a zip/filesystem
-// folder name (e.g. someone pastes a prompt fragment as the stash name) —
+// folder name (e.g. someone pastes a prompt fragment as the stash name) -
 // sanitize for the folder, but keep the original label as the DB value
 // (round-tripped separately, not derived from the sanitized folder name).
 function sanitizeFolderName(label: string): string {
@@ -467,7 +482,7 @@ function sanitizeFolderName(label: string): string {
 }
 
 // Exported structure is deliberately just folders-of-(image, sidecar .txt)
-// — the same pairing already used in imagesDir — rather than a manifest
+// - the same pairing already used in imagesDir - rather than a manifest
 // format of our own: it's directly browsable (open the zip, view the PNGs,
 // read the prompt/seed next to each one) and re-importable using only that
 // pairing, no app-specific format to parse.
@@ -495,11 +510,11 @@ function parseSeedPart(seedPart: string): string | null {
   return seedMatch ? seedMatch[1] : null;
 }
 
-// Inverse of sidecarText() — tolerant of the prompt itself spanning
+// Inverse of sidecarText() - tolerant of the prompt itself spanning
 // multiple lines (it usually does), since the greedy match only backs off
 // as far as the final "\nSeed: ...\nCreated: " lines, wherever those
 // actually fall. Also tolerant of a sidecar exported before the "Created:"
-// line existed — createdAt comes back null rather than failing to parse.
+// line existed - createdAt comes back null rather than failing to parse.
 function parseSidecarText(text: string): {
   promptText: string;
   seed: string | null;
@@ -521,7 +536,7 @@ function parseSidecarText(text: string): {
 const IMPORT_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
 
 // Folder name becomes the batch label verbatim (whatever was exported, or
-// whatever a human named the folder by hand) — every image/sidecar pair
+// whatever a human named the folder by hand) - every image/sidecar pair
 // inside it imports as one generation. A bare image with no matching .txt
 // still imports fine (just with an empty prompt and no seed), so a folder
 // of plain images dropped in by hand is valid input too, not just our own
@@ -540,7 +555,7 @@ export function importGalleryZip(zipPath: string): GalleryImportResult {
   // own default, not something we opted into), and our filenames are
   // random UUIDs, so that order has nothing to do with creation order.
   // Every pending item's real createdAt (from its sidecar) is collected
-  // first, then everything is sorted by that before any DB insert — insert
+  // first, then everything is sorted by that before any DB insert - insert
   // order is what fixes each row's auto-increment id, which is what
   // listGenerations()'s `ORDER BY id DESC` actually displays by.
   const zip = new AdmZip(zipPath);
@@ -585,7 +600,7 @@ export function importGalleryZip(zipPath: string): GalleryImportResult {
   }
 
   // Unknown createdAt (no sidecar, or one from before this field existed)
-  // sorts first — there's no way to know its real position, and it's no
+  // sorts first - there's no way to know its real position, and it's no
   // worse than the alphabetical-by-UUID order this replaces.
   pending.sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
 
@@ -594,7 +609,7 @@ export function importGalleryZip(zipPath: string): GalleryImportResult {
     const ext = IMPORT_IMAGE_EXT.exec(item.image.entryName)?.[1].toLowerCase() ?? 'png';
     const createdAt = item.createdAt ?? new Date().toISOString();
     // Insert first for the row id (the per-image .json records it), then
-    // write the files, then fill in the path — the same order saveGeneration
+    // write the files, then fill in the path - the same order saveGeneration
     // uses. Insert order still fixes each row's auto-increment id, which is
     // what the sort above exists to control.
     const { lastInsertRowid } = db
@@ -623,7 +638,7 @@ export function importGalleryZip(zipPath: string): GalleryImportResult {
 export function getGeneration(id: number): Generation | null {
   const row = db
     .prepare(
-      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at FROM generations WHERE id = ?',
+      'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at, score, category FROM generations WHERE id = ?',
     )
     .get(id) as
     | {
@@ -634,6 +649,8 @@ export function getGeneration(id: number): Generation | null {
         seed: string | null;
         image_path: string;
         created_at: string;
+        score: number | null;
+        category: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -646,7 +663,37 @@ export function getGeneration(id: number): Generation | null {
     imagePath: resolveImagePath(libraryRoot, row.image_path),
     imageUrl: pathToFileURL(resolveImagePath(libraryRoot, row.image_path)).href,
     createdAt: row.created_at,
+    score: row.score !== null && row.score !== undefined ? Number(row.score) : null,
+    category: row.category ?? null,
   };
+}
+
+function updateJsonSidecar(id: number): void {
+  try {
+    const row = db
+      .prepare(
+        'SELECT id, batch_label, prompt_text, selection_json, seed, image_path, created_at, score, category FROM generations WHERE id = ?',
+      )
+      .get(id) as (GenerationRow & { score: number | null; category: string | null }) | undefined;
+    if (!row || !row.image_path) return;
+    const fullImagePath = resolveImagePath(libraryRoot, row.image_path);
+    const jsonPath = jsonPathFor(fullImagePath);
+    if (fs.existsSync(jsonPath)) {
+      fs.writeFileSync(jsonPath, imageJsonContent(row, path.basename(fullImagePath)));
+    }
+  } catch {
+    // Non-fatal if sidecar update fails.
+  }
+}
+
+export function setGenerationScore(id: number, score: number | null): void {
+  db.prepare('UPDATE generations SET score = ? WHERE id = ?').run(score, id);
+  updateJsonSidecar(id);
+}
+
+export function setGenerationCategory(id: number, category: string | null): void {
+  db.prepare('UPDATE generations SET category = ? WHERE id = ?').run(category, id);
+  updateJsonSidecar(id);
 }
 
 // Takes the *stored* path (relative for migrated rows, absolute for older
@@ -655,7 +702,7 @@ export function getGeneration(id: number): Generation | null {
 // The sidecar path comes from sidecarPathFor, which strips whatever
 // extension the image actually has. The previous version stripped only
 // `.png`, so for the half of the library stored as .jpeg it built
-// "<uuid>.jpeg.txt" — a path that never exists — and `force: true` swallowed
+// "<uuid>.jpeg.txt" - a path that never exists - and `force: true` swallowed
 // the miss, orphaning the sidecar every time a .jpeg generation was deleted.
 function removeImageAndSidecar(storedPath: string): void {
   const imagePath = resolveImagePath(libraryRoot, storedPath);
@@ -682,7 +729,7 @@ export function deleteBatch(batchLabel: string): void {
   for (const row of rows) {
     removeImageAndSidecar(row.image_path);
   }
-  // Only the index.json this app wrote, and only if nothing else remains —
+  // Only the index.json this app wrote, and only if nothing else remains -
   // a stash folder a user has dropped their own files into is left alone.
   const dir = groupDir(libraryRoot, batchLabel || 'Unsorted');
   try {

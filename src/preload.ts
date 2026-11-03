@@ -33,6 +33,9 @@ const api: PromptLoomApi = {
   renameBatch: (oldLabel, newLabel) =>
     ipcRenderer.invoke('generations:renameBatch', oldLabel, newLabel),
   saveGenerationAs: (id) => ipcRenderer.invoke('generations:saveAs', id),
+  setGenerationScore: (id, score) => ipcRenderer.invoke('generations:setScore', id, score),
+  setGenerationCategory: (id, category) =>
+    ipcRenderer.invoke('generations:setCategory', id, category),
 
   populatePrompt: (promptText) => ipcRenderer.invoke('driver:populatePrompt', promptText),
   getCurrentStash: () => ipcRenderer.invoke('stash:getCurrent'),
@@ -40,7 +43,7 @@ const api: PromptLoomApi = {
   setPerchanceHidden: (hidden) => ipcRenderer.invoke('perchance:setHidden', hidden),
   onPerchanceStatus: (callback) => {
     // The view may have already fired its first load event before this
-    // subscribes — fetch the cached status once up front so that event
+    // subscribes - fetch the cached status once up front so that event
     // isn't missed, then keep listening for future updates.
     ipcRenderer.invoke('perchance:getStatus').then(callback);
 

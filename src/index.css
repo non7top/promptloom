@@ -91,7 +91,7 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
-/* Small, fixed-height icon by default — matches an expanded (open) stash. */
+/* Small, fixed-height icon by default - matches an expanded (open) stash. */
 .btn-docked-corner {
   position: absolute;
   top: -1px;
@@ -108,7 +108,7 @@ input:focus-visible {
   box-shadow: none;
 }
 
-/* Collapsed stashes are short rows — stretch the button to fill that row
+/* Collapsed stashes are short rows - stretch the button to fill that row
    completely instead of staying a small fixed icon within it. */
 .category:not([open]) .btn-docked-corner {
   height: auto;
@@ -194,7 +194,7 @@ input {
 
 .sidebar-header {
   /* Pinned to #sidebar's own scroll (the nearest scrolling ancestor), not
-     the viewport — an opaque background is required for sticky, otherwise
+     the viewport - an opaque background is required for sticky, otherwise
      Gallery content scrolls up visibly underneath it instead of behind it. */
   position: sticky;
   top: 0;
@@ -246,7 +246,7 @@ input {
   box-shadow: none;
 }
 
-/* Sticks to the right side of the tab row, small — not a 4th equal-width
+/* Sticks to the right side of the tab row, small - not a 4th equal-width
    tab like Definitions/Composer/Gallery. */
 .tabs button.tab-collapse {
   flex: none;
@@ -259,7 +259,7 @@ input {
   font-size: 0.8rem;
 }
 
-/* With the panel collapsed there's plenty of room — no need for this one
+/* With the panel collapsed there's plenty of room - no need for this one
    to stay small, it can share equal width with the other three tabs. */
 #sidebar.sidebar-expanded .tabs button.tab-collapse {
   flex: 1;
@@ -267,7 +267,7 @@ input {
   height: auto;
 }
 
-/* Same footprint as .tab-collapse — see the comment in App.tsx for why
+/* Same footprint as .tab-collapse - see the comment in App.tsx for why
    Settings is an icon rather than a fourth equal-width tab. */
 .tabs button.tab-icon {
   flex: none;
@@ -398,7 +398,7 @@ input {
 }
 
 /* A bigger, easier-to-hit way to collapse an expanded stash than just the
-   text link at the bottom — runs the full height of the card, below the
+   text link at the bottom - runs the full height of the card, below the
    header row so it doesn't overlap the delete button there. */
 .collapse-side-strip {
   position: absolute;
@@ -440,6 +440,199 @@ input {
   margin-bottom: 0.75rem;
 }
 
+.gallery-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.65rem;
+  background: #f4f6f9;
+  border: 1px solid #dcdfe4;
+  border-radius: 6px;
+}
+
+.gallery-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.gallery-filter-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.75rem;
+  min-width: 54px;
+}
+
+.gallery-filter-pill {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  line-height: 1.2;
+}
+
+.gallery-filter-pill:hover {
+  background: #f0f0f0;
+  border-color: #bbb;
+}
+
+.gallery-filter-pill.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.gallery-filter-circle {
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.gallery-filter-circle:hover {
+  transform: scale(1.15);
+}
+
+.gallery-filter-circle.active {
+  transform: scale(1.2);
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #3b82f6;
+}
+
+.gallery-filter-clear {
+  margin-left: auto;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.gallery-filter-clear:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.gallery-image-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.gallery-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.25) 75%, transparent 100%);
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.gallery-score-buttons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  pointer-events: auto;
+}
+
+.gallery-score-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.gallery-score-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: #fff;
+  transform: translateY(-1px);
+}
+
+.gallery-score-btn.active {
+  background: #f59e0b;
+  border-color: #fff;
+  color: #111;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px #fff, 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.gallery-category-circles {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.gallery-category-circle {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  opacity: 0.85;
+}
+
+.gallery-category-circle:hover {
+  transform: scale(1.15);
+  opacity: 1;
+  border-color: #fff;
+}
+
+.gallery-category-circle.active {
+  transform: scale(1.25);
+  opacity: 1;
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0, 0, 0, 0.6);
+}
+
+#sidebar.sidebar-expanded .gallery-score-btn {
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+}
+
+#sidebar.sidebar-expanded .gallery-category-circle {
+  width: 14px;
+  height: 14px;
+}
+
 .gallery-toolbar .hint {
   margin: 0;
 }
@@ -453,7 +646,7 @@ input {
   gap: 1px;
 }
 
-/* With the right panel collapsed, #sidebar fills the window — worth a
+/* With the right panel collapsed, #sidebar fills the window - worth a
    multi-column layout instead of one big column of images. */
 #sidebar.sidebar-expanded .gallery {
   grid-template-columns: repeat(4, 1fr);
@@ -472,7 +665,7 @@ input {
 .lightbox-backdrop {
   /* Fixed to the viewport (not #sidebar's scroll position) so it stays
      visible regardless of scroll offset, but width-capped to the sidebar's
-     own width — the perchance WebContentsView sits on top of anything past
+     own width - the perchance WebContentsView sits on top of anything past
      that edge anyway. */
   position: fixed;
   top: 0;
@@ -603,7 +796,7 @@ input {
 
 /* Deleting a single image is a soft, undoable action: the card collapses
    down to this thin bar and fades, then actually deletes once the timer
-   below runs out — unlike deleting a whole stash, which needs an explicit
+   below runs out - unlike deleting a whole stash, which needs an explicit
    Yes/No confirmation instead. */
 .gallery li.gallery-pending-delete {
   display: flex;

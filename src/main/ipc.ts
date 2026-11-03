@@ -9,7 +9,7 @@ import { getDefaultLibraryPath, loadSettings, setLibraryPath } from './settings'
 import { migrateLibrary, planMigration, rollbackMigration } from './storage';
 import type { GalleryExportResult, GalleryImportResult } from '../shared/types';
 
-// Triggered from the native app menu (main.ts), not a renderer button —
+// Triggered from the native app menu (main.ts), not a renderer button -
 // exported as plain functions rather than folded into registerIpcHandlers
 // below, since there's no IPC round-trip to wire up for a menu click.
 export async function exportGalleryViaDialog(
@@ -44,7 +44,7 @@ export async function importGalleryViaDialog(
 }
 
 // Whatever a perchance-side save lands in before Composer's own start()
-// ever sets a real stash name — today's date rather than a generic bucket,
+// ever sets a real stash name - today's date rather than a generic bucket,
 // same fallback Composer.tsx uses when its own name field is left blank.
 let currentStash = new Date().toISOString().slice(0, 10);
 
@@ -142,7 +142,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('library:migrate', () => migrateLibrary(db.getDb(), db.getLibraryRoot()));
   ipcMain.handle('library:rollback', async () => {
     const root = db.getLibraryRoot();
-    // Newest manifest wins — rollback is an "undo the migration I just ran"
+    // Newest manifest wins - rollback is an "undo the migration I just ran"
     // action, not a general time machine.
     const manifests = fs
       .readdirSync(root)
@@ -168,6 +168,12 @@ export function registerIpcHandlers(): void {
     ) => db.saveGeneration(batchLabel, promptText, selection, seed, imageDataUrl),
   );
   ipcMain.handle('generations:delete', (_event, id: number) => db.deleteGeneration(id));
+  ipcMain.handle('generations:setScore', (_event, id: number, score: number | null) =>
+    db.setGenerationScore(id, score),
+  );
+  ipcMain.handle('generations:setCategory', (_event, id: number, category: string | null) =>
+    db.setGenerationCategory(id, category),
+  );
   ipcMain.handle('generations:deleteBatch', (_event, batchLabel: string) =>
     db.deleteBatch(batchLabel),
   );
@@ -214,7 +220,7 @@ export function registerIpcHandlers(): void {
   });
 
   // Fire-and-forget from perchance's own save button, wrapped by
-  // perchanceDriver.ts (via perchancePreload.ts's bridge) — not a
+  // perchanceDriver.ts (via perchancePreload.ts's bridge) - not a
   // request/response, so `.on` rather than `.handle`. The image data and
   // its prompt/seed are read from the page itself, not tracked by us,
   // since a manually-saved image might not correspond to whatever we last
@@ -231,7 +237,7 @@ export function registerIpcHandlers(): void {
         imageDataUrl,
       );
       // Perchance's save button lives in a separate native WebContentsView,
-      // not the app's own renderer — the Gallery has no other way to learn
+      // not the app's own renderer - the Gallery has no other way to learn
       // a new image landed, so push it a confirmation to refresh from.
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send('generations:saved', generation);
@@ -243,7 +249,7 @@ export function registerIpcHandlers(): void {
   // in perchance's own community gallery (perchanceDriver.ts's injected
   // save button there): those tiles only carry a remote image URL, not an
   // already-captured data URL, so the bytes are fetched here in the main
-  // process — a page-context fetch()/canvas read would be blocked by the
+  // process - a page-context fetch()/canvas read would be blocked by the
   // image host's own CORS policy, which doesn't apply to a Node-side fetch.
   ipcMain.on(
     'perchance:saveImageFromUrl',
@@ -281,7 +287,7 @@ export function registerIpcHandlers(): void {
   );
 
   // Answers perchanceDriver.ts's injected gallery script: "is this tile
-  // already saved?" Two-step, cheapest first — see db.ts's
+  // already saved?" Two-step, cheapest first - see db.ts's
   // findGenerationBySourceGalleryId/findGenerationsByPromptText for why the
   // second step exists and can't just trust the prompt match alone.
   ipcMain.handle(
@@ -310,7 +316,7 @@ export function registerIpcHandlers(): void {
         try {
           localHash = createHash('sha256').update(fs.readFileSync(candidate.imagePath)).digest('hex');
         } catch {
-          // The candidate's file may have since been deleted — skip it.
+          // The candidate's file may have since been deleted - skip it.
           continue;
         }
         if (localHash === remoteHash) {

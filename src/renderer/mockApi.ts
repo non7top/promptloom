@@ -181,6 +181,14 @@ export const mockApi: PromptLoomApi = {
     }
   },
   saveGenerationAs: async () => null,
+  setGenerationScore: async (id, score) => {
+    const g = generations.find((item) => item.id === id);
+    if (g) g.score = score;
+  },
+  setGenerationCategory: async (id, category) => {
+    const g = generations.find((item) => item.id === id);
+    if (g) g.category = category;
+  },
 
   populatePrompt: async () => undefined,
   getCurrentStash: async () => currentStash,

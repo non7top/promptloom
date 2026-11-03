@@ -26,7 +26,7 @@ export const LEGACY_IMAGES_DIRNAME = 'images';
 const RESERVED_WINDOWS_NAMES =
   /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
 
-// One path segment of a label. `/` is NOT handled here — labelToRelDir splits
+// One path segment of a label. `/` is NOT handled here - labelToRelDir splits
 // on it first, which is what makes nested labels ("characters/hermione") turn
 // into nested folders rather than one folder with an underscore in its name.
 export function sanitizeSegment(segment: string): string {
@@ -63,7 +63,7 @@ export function groupDir(libraryPath: string, label: string): string {
 
 // The sidecar sits next to the image under the same basename. Deriving it by
 // stripping *any* extension is the fix for the long-standing bug where this
-// was `imagePath.replace(/\.png$/i, '') + '.txt'` — half the library is
+// was `imagePath.replace(/\.png$/i, '') + '.txt'` - half the library is
 // stored as .jpeg, and for those that produced "<uuid>.jpeg.txt", a path
 // that never exists, so deleting a .jpeg generation orphaned its sidecar.
 export function sidecarPathFor(imagePath: string): string {
@@ -114,6 +114,8 @@ export interface GenerationRow {
   seed: string | null;
   image_path: string;
   created_at: string;
+  score?: number | null;
+  category?: string | null;
 }
 
 export function imageJsonContent(row: GenerationRow, imageFileName: string): string {
@@ -126,6 +128,8 @@ export function imageJsonContent(row: GenerationRow, imageFileName: string): str
       selection: JSON.parse(row.selection_json || '{}'),
       createdAt: row.created_at,
       image: imageFileName,
+      score: row.score ?? null,
+      category: row.category ?? null,
     },
     null,
     2,
@@ -186,7 +190,7 @@ export function writeFileAtomic(filePath: string, contents: string | Buffer): vo
 
 // Rough headroom for the DB snapshot plus the per-image JSON files. The
 // images themselves are *renamed*, not copied, so the migration moves no
-// bytes — but refusing to start on a nearly-full disk is the whole point,
+// bytes - but refusing to start on a nearly-full disk is the whole point,
 // since disk-full mid-write is the one realistic way to corrupt SQLite.
 const MIGRATION_SLACK_BYTES = 100 * 1024 * 1024;
 
@@ -259,7 +263,7 @@ export function migrateLibrary(db: DatabaseSync, libraryPath: string): Migration
 
   if (report.collisions.length) {
     report.errors.push(
-      `${report.collisions.length} folder name collision(s) — rename the stashes first, nothing was moved.`,
+      `${report.collisions.length} folder name collision(s) - rename the stashes first, nothing was moved.`,
     );
     return report;
   }
@@ -273,7 +277,7 @@ export function migrateLibrary(db: DatabaseSync, libraryPath: string): Migration
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
   // Snapshot first. VACUUM INTO writes a consistent copy without stopping
-  // the world, and it is a plain .sqlite file — restoring is a file copy,
+  // the world, and it is a plain .sqlite file - restoring is a file copy,
   // not an import.
   const backupPath = path.join(libraryPath, `promptloom.backup-${stamp}.sqlite`);
   db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
@@ -312,7 +316,7 @@ export function migrateLibrary(db: DatabaseSync, libraryPath: string): Migration
           `${JSON.stringify({ id: row.id, from, to, storedBefore: row.image_path })}\n`,
         );
 
-        // Same volume, so this is an atomic metadata operation — no bytes
+        // Same volume, so this is an atomic metadata operation - no bytes
         // are copied and there is no window where the file is half-written.
         fs.renameSync(from, to);
         if (fs.existsSync(fromSidecar)) fs.renameSync(fromSidecar, toSidecar);
@@ -336,7 +340,7 @@ export function migrateLibrary(db: DatabaseSync, libraryPath: string): Migration
 
   writeIndexes(db, libraryPath);
 
-  // Only if it actually emptied — anything left behind is unaccounted for
+  // Only if it actually emptied - anything left behind is unaccounted for
   // and deleting it would be destroying data we failed to migrate.
   const legacyDir = path.join(libraryPath, LEGACY_IMAGES_DIRNAME);
   try {
