@@ -1,5 +1,32 @@
 # Changelog
 
+## [4.7.0](https://github.com/non7top/promptloom/compare/v4.6.2...v4.7.0) (2026-11-04)
+
+
+### Features
+
+* **gallery:** add score buttons and category circles with filtering ([b539c8a](https://github.com/non7top/promptloom/commit/b539c8a7cd622a095a104c7b10ab1e7b70219180))
+* **gallery:** add score buttons and category circles with filtering ([43aab8d](https://github.com/non7top/promptloom/commit/43aab8d36fbe1af34abc1d9206fe68a49a573a54))
+
+
+### Bug Fixes
+
+* **gallery:** preserve aspect-ratio for lazy loading and optimize hash checks ([e6e411b](https://github.com/non7top/promptloom/commit/e6e411b5dea66ec98db717b3fc42f7b050945446))
+
+
+### Miscellaneous Chores
+
+* bump @types/node from 26.6.4 to 26.6.6 ([a395f9b](https://github.com/non7top/promptloom/commit/a395f9b76ed39c870359d40473413658ed3f854b))
+* bump @types/node from 26.6.4 to 26.6.6 ([5195a54](https://github.com/non7top/promptloom/commit/5195a541a4d1421ab5c9a0bc8441e23aff547243))
+* bump @vitejs/plugin-react from 6.1.1 to 6.1.2 ([b55a5df](https://github.com/non7top/promptloom/commit/b55a5dfc14d18d47897ff7fcf35b18cdb00c860e))
+* bump electron-vite from 6.0.0-beta.1 to 6.0.0 ([3f65dbf](https://github.com/non7top/promptloom/commit/3f65dbfb2c12bf3ee6035bf710bb2e1a748b0335))
+* bump react from 19.3.0 to 19.3.1 ([9498d15](https://github.com/non7top/promptloom/commit/9498d15551cd1be3d1d38970a13bb1cf104983a3))
+* bump resedit from 1.7.2 to 3.1.0 ([bf2851d](https://github.com/non7top/promptloom/commit/bf2851d48e6293dcad6665e61524cd41466215f7))
+* bump resedit from 1.7.2 to 3.1.0 ([3b2595e](https://github.com/non7top/promptloom/commit/3b2595e83a997d84480e9e89ef2be8205a7abfc1))
+* configure release-please always-update and changelog sections ([b7a3bbb](https://github.com/non7top/promptloom/commit/b7a3bbb47b504fe9b2db92adce3e16c8b69f1fc3))
+* **dependabot:** use deps commit message prefix ([51b5883](https://github.com/non7top/promptloom/commit/51b58838df40cfde09314e364148b5a3b2b61fc8))
+* **dependabot:** use deps commit message prefix ([eb6565c](https://github.com/non7top/promptloom/commit/eb6565cee6c115ebe17bacafeae5283ca3883810))
+
 ## [4.6.2](https://github.com/non7top/promptloom/compare/v4.6.1...v4.6.2) (2026-10-27)
 
 
