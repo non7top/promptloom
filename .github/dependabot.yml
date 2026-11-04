@@ -4,18 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    # "chore" for both — a dependency bump isn't reliably just a "fix"
-    # (could carry breaking changes or capability we now rely on), and
-    # there's no static way to have Dependabot self-report severity. A
-    # human decides if a given bump actually warrants a real release,
-    # rather than every bump silently triggering one.
+    # "deps" categorizes dependency bumps under Dependencies in the changelog.
     commit-message:
-      prefix: "chore"
-      prefix-development: "chore"
+      prefix: "deps"
+      prefix-development: "deps"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
     commit-message:
-      prefix: "chore"
+      prefix: "deps"

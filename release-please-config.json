@@ -5,7 +5,15 @@
       "release-type": "node",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
-      "extra-label": "RELEASE"
+      "extra-label": "RELEASE",
+      "always-update": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "perf", "section": "Performance Improvements" },
+        { "type": "deps", "section": "Dependencies" },
+        { "type": "chore", "section": "Miscellaneous Chores" }
+      ]
     }
   }
 }
