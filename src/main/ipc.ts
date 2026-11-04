@@ -330,27 +330,53 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  // Answers the Favorites tiles' "already saved?" check by content. File
-  // hashes are cached per path (saved images never change), and only files
-  // of the same byte length are hashed, so the first call doesn't read the
-  // whole library.
+  // Answers Favorites tiles' "already saved?" check by content.
+  // Direct indexed lookups and in-memory caches avoid repetitive disk stats.
+  const sizeByPath = new Map<string, number>();
   const hashByPath = new Map<string, string>();
   ipcMain.handle(
     'perchance:checkImageHashSaved',
     async (_event, sha256: string, byteLength: number): Promise<boolean> => {
-      for (const generation of db.listGenerations()) {
+      if (db.findGenerationBySha256(sha256)) return true;
+
+      const sizedCandidates = db.findGenerationsByFileSize(byteLength);
+      for (const candidate of sizedCandidates) {
         try {
-          let hash = hashByPath.get(generation.imagePath);
+          let hash = hashByPath.get(candidate.imagePath);
           if (!hash) {
-            if ((await fs.promises.stat(generation.imagePath)).size !== byteLength) continue;
             hash = createHash('sha256')
-              .update(await fs.promises.readFile(generation.imagePath))
+              .update(await fs.promises.readFile(candidate.imagePath))
               .digest('hex');
-            hashByPath.set(generation.imagePath, hash);
+            hashByPath.set(candidate.imagePath, hash);
+            db.setGenerationHashInfo(candidate.id, byteLength, hash);
           }
           if (hash === sha256) return true;
         } catch {
-          // The file may have been deleted since it was listed.
+          // File may have been deleted.
+        }
+      }
+
+      for (const item of db.listGenerationImagePaths()) {
+        try {
+          let size = sizeByPath.get(item.imagePath);
+          if (size === undefined) {
+            const stat = await fs.promises.stat(item.imagePath);
+            size = stat.size;
+            sizeByPath.set(item.imagePath, size);
+          }
+          if (size !== byteLength) continue;
+
+          let hash = hashByPath.get(item.imagePath);
+          if (!hash) {
+            hash = createHash('sha256')
+              .update(await fs.promises.readFile(item.imagePath))
+              .digest('hex');
+            hashByPath.set(item.imagePath, hash);
+          }
+          db.setGenerationHashInfo(item.id, size, hash);
+          if (hash === sha256) return true;
+        } catch {
+          // File may have been deleted.
         }
       }
       return false;

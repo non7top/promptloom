@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -75,7 +75,9 @@ export function initDb(libraryPath: string): void {
       created_at TEXT NOT NULL,
       source_gallery_id TEXT,
       score INTEGER,
-      category TEXT
+      category TEXT,
+      file_size INTEGER,
+      sha256 TEXT
     );
   `);
 
@@ -94,6 +96,12 @@ export function initDb(libraryPath: string): void {
   if (!generationsColumns.some((column) => column.name === 'category')) {
     db.exec('ALTER TABLE generations ADD COLUMN category TEXT;');
   }
+  if (!generationsColumns.some((column) => column.name === 'file_size')) {
+    db.exec('ALTER TABLE generations ADD COLUMN file_size INTEGER;');
+  }
+  if (!generationsColumns.some((column) => column.name === 'sha256')) {
+    db.exec('ALTER TABLE generations ADD COLUMN sha256 TEXT;');
+  }
   // Backs both halves of the perchance-gallery "already saved?" check
   // (perchanceDriver.ts's injected script, via ipc.ts's
   // perchance:checkGallerySaved): the fast path looks up source_gallery_id
@@ -105,6 +113,8 @@ export function initDb(libraryPath: string): void {
     CREATE INDEX IF NOT EXISTS idx_generations_prompt_text ON generations(prompt_text);
     CREATE INDEX IF NOT EXISTS idx_generations_score ON generations(score);
     CREATE INDEX IF NOT EXISTS idx_generations_category ON generations(category);
+    CREATE INDEX IF NOT EXISTS idx_generations_file_size ON generations(file_size);
+    CREATE INDEX IF NOT EXISTS idx_generations_sha256 ON generations(sha256);
   `);
 
   // Still created: it stays the home for anything not yet migrated into
@@ -401,13 +411,6 @@ export function saveGeneration(
   sourceGalleryId: string | null = null,
 ): Generation {
   const createdAt = new Date().toISOString();
-  const { lastInsertRowid } = db
-    .prepare(
-      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at, source_gallery_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    )
-    .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt, sourceGalleryId);
-  const id = Number(lastInsertRowid);
-
   // Extension follows the data URL's own mime subtype rather than being
   // hardcoded, since callers other than perchance's own (PNG) save button
   // - e.g. saving a JPEG straight from the community gallery - pass through
@@ -415,6 +418,17 @@ export function saveGeneration(
   const match = /^data:image\/(\w+);base64,(.+)$/.exec(imageDataUrl);
   const ext = match?.[1] || 'png';
   const base64 = match?.[2] ?? imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const imageBytes = Buffer.from(base64, 'base64');
+  const fileSize = imageBytes.length;
+  const sha256 = createHash('sha256').update(imageBytes).digest('hex');
+
+  const { lastInsertRowid } = db
+    .prepare(
+      'INSERT INTO generations (batch_label, prompt_text, selection_json, seed, image_path, created_at, source_gallery_id, file_size, sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(batchLabel, promptText, JSON.stringify(selection), seed, '', createdAt, sourceGalleryId, fileSize, sha256);
+  const id = Number(lastInsertRowid);
+
   const storedPath = writeGenerationFiles(
     id,
     batchLabel,
@@ -422,7 +436,7 @@ export function saveGeneration(
     selection,
     seed,
     createdAt,
-    Buffer.from(base64, 'base64'),
+    imageBytes,
     ext,
   );
   db.prepare('UPDATE generations SET image_path = ? WHERE id = ?').run(storedPath, id);
@@ -438,6 +452,31 @@ export function saveGeneration(
     imageUrl: pathToFileURL(imagePath).href,
     createdAt,
   };
+}
+
+export function findGenerationBySha256(sha256: string): boolean {
+  const row = db
+    .prepare('SELECT 1 FROM generations WHERE sha256 = ? LIMIT 1')
+    .get(sha256) as { id: number } | undefined;
+  return row !== undefined;
+}
+
+export function findGenerationsByFileSize(fileSize: number): { id: number; imagePath: string }[] {
+  const rows = db
+    .prepare('SELECT id, image_path FROM generations WHERE file_size = ?')
+    .all(fileSize) as { id: number; image_path: string }[];
+  return rows.map((row) => ({ id: row.id, imagePath: resolveImagePath(libraryRoot, row.image_path) }));
+}
+
+export function setGenerationHashInfo(id: number, fileSize: number, sha256: string): void {
+  db.prepare('UPDATE generations SET file_size = ?, sha256 = ? WHERE id = ?').run(fileSize, sha256, id);
+}
+
+export function listGenerationImagePaths(): { id: number; imagePath: string }[] {
+  const rows = db
+    .prepare('SELECT id, image_path FROM generations WHERE file_size IS NULL')
+    .all() as { id: number; image_path: string }[];
+  return rows.map((row) => ({ id: row.id, imagePath: resolveImagePath(libraryRoot, row.image_path) }));
 }
 
 // Fast path for "has this perchance gallery image already been saved?" -

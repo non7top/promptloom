@@ -532,6 +532,12 @@ input {
 .gallery-image-wrap {
   position: relative;
   width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.gallery-image-wrap img {
+  width: 100%;
+  height: 100%;
 }
 
 .gallery-image-overlay {
@@ -706,6 +712,8 @@ input {
      summary line would otherwise force the track (and visually the whole
      sidebar) wider instead of being clipped by its own overflow:hidden. */
   min-width: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 380px;
 }
 
 .gallery li:hover {
