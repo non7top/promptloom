@@ -27,7 +27,7 @@ export interface GalleryImportResult {
 }
 
 // Export/import are triggered from the native app menu (main.ts), not a
-// renderer button — there's no request/response call to hand a result
+// renderer button - there's no request/response call to hand a result
 // back through, so the main process pushes it here instead. `result` is
 // null when the user cancels the save/open dialog.
 export type GalleryActionResult =
@@ -43,9 +43,20 @@ export interface Generation {
   imagePath: string;
   imageUrl: string;
   createdAt: string;
+  score?: number | null;
+  category?: string | null;
 }
 
-// Result of both the dry run and the real migration — same shape, so the
+export const GALLERY_CATEGORIES = [
+  { id: 'red', label: 'Red', color: '#ef4444' },
+  { id: 'green', label: 'Green', color: '#22c55e' },
+  { id: 'blue', label: 'Blue', color: '#3b82f6' },
+  { id: 'yellow', label: 'Yellow', color: '#eab308' },
+] as const;
+
+export type GalleryCategoryId = (typeof GALLERY_CATEGORIES)[number]['id'];
+
+// Result of both the dry run and the real migration - same shape, so the
 // preview a user approves is literally the same report they get back
 // afterwards, with `dryRun` and the counters as the difference.
 export interface MigrationReport {
@@ -75,7 +86,7 @@ export interface LibraryInfo {
   imageBytes: number;
   dbBytes: number;
   freeBytes: number;
-  // True once every generation resolves inside stashes/ — i.e. the
+  // True once every generation resolves inside stashes/ - i.e. the
   // per-group migration has been run and nothing is left in the flat
   // images/ directory.
   migrated: boolean;
@@ -117,10 +128,12 @@ export interface PromptLoomApi {
   deleteBatch(batchLabel: string): Promise<void>;
   renameBatch(oldLabel: string, newLabel: string): Promise<void>;
   saveGenerationAs(id: number): Promise<string | null>;
+  setGenerationScore(id: number, score: number | null): Promise<void>;
+  setGenerationCategory(id: number, category: string | null): Promise<void>;
 
   getLibraryInfo(): Promise<LibraryInfo>;
   // Opens a folder picker. Returns the chosen path, and the app relaunches
-  // onto it — swapping the SQLite handle and every renderer-held path live,
+  // onto it - swapping the SQLite handle and every renderer-held path live,
   // while a perchance save could be in flight, is not worth the risk.
   chooseLibrary(): Promise<string | null>;
   openLibrary(libraryPath: string): Promise<boolean>;

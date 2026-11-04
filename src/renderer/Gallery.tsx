@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Generation } from '../shared/types';
+import { GALLERY_CATEGORIES, type Generation } from '../shared/types';
 
 const DELETE_UNDO_WINDOW_MS = 10_000;
 const JUST_SAVED_HIGHLIGHT_MS = 2_000;
@@ -39,6 +39,8 @@ export default function Gallery({ query }: { query: string }) {
   const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
   const galleryStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [filterScore, setFilterScore] = useState<number | 'none' | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string | 'none' | null>(null);
 
   const reload = async () => {
     setGenerations(await window.promptloom.listGenerations());
@@ -54,7 +56,7 @@ export default function Gallery({ query }: { query: string }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload is redefined every render (not memoized); this subscribes once to onGenerationSaved and should not re-subscribe every render.
   useEffect(() => {
     // Perchance's own save button writes straight to the DB from the main
-    // process, bypassing any renderer action of ours — this is the only
+    // process, bypassing any renderer action of ours - this is the only
     // signal we get that a new image landed, so re-fetch and briefly
     // highlight it.
     return window.promptloom.onGenerationSaved((generation) => {
@@ -70,7 +72,7 @@ export default function Gallery({ query }: { query: string }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload/showGalleryStatus are redefined every render; this subscribes once and should not re-subscribe every render.
   useEffect(() => {
     // Export/Import live in the native app menu (main.ts), not a button
-    // here — there's no direct call to react to, so the result arrives as
+    // here - there's no direct call to react to, so the result arrives as
     // a push instead.
     return window.promptloom.onGalleryAction(({ kind, result }) => {
       if (!result) return; // dialog was canceled
@@ -79,7 +81,7 @@ export default function Gallery({ query }: { query: string }) {
       } else {
         showGalleryStatus(
           `Imported ${result.imported} image${result.imported === 1 ? '' : 's'}` +
-            (result.skipped ? ` (${result.skipped} skipped — no image found)` : ''),
+            (result.skipped ? ` (${result.skipped} skipped - no image found)` : ''),
         );
         reload();
       }
@@ -96,7 +98,7 @@ export default function Gallery({ query }: { query: string }) {
   }, []);
 
   // Deleting one image is a soft, undoable action: it visually collapses
-  // right away, then only actually deletes once the undo window elapses —
+  // right away, then only actually deletes once the undo window elapses -
   // unlike a whole stash, which needs an explicit Yes/No click instead.
   const scheduleDelete = (id: number) => {
     setPendingDeleteIds((prev) => new Set(prev).add(id));
@@ -168,13 +170,118 @@ export default function Gallery({ query }: { query: string }) {
     });
   };
 
+  const handleSetScore = async (id: number, score: number | null) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, score } : g)),
+    );
+    await window.promptloom.setGenerationScore(id, score);
+  };
+
+  const handleSetCategory = async (id: number, category: string | null) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, category } : g)),
+    );
+    await window.promptloom.setGenerationCategory(id, category);
+  };
+
   const needle = query.trim().toLowerCase();
-  const visibleGenerations = needle
-    ? generations.filter((g) => `${g.promptText} ${g.seed ?? ''}`.toLowerCase().includes(needle))
-    : generations;
+  const visibleGenerations = generations.filter((g) => {
+    if (needle && !`${g.promptText} ${g.seed ?? ''}`.toLowerCase().includes(needle)) {
+      return false;
+    }
+    if (filterScore !== null) {
+      if (filterScore === 'none') {
+        if (g.score !== null && g.score !== undefined) return false;
+      } else if (g.score !== filterScore) {
+        return false;
+      }
+    }
+    if (filterCategory !== null) {
+      if (filterCategory === 'none') {
+        if (g.category !== null && g.category !== undefined) return false;
+      } else if (g.category !== filterCategory) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const isFiltered = Boolean(needle || filterScore !== null || filterCategory !== null);
 
   return (
     <div>
+      <div className="gallery-filter-bar">
+        <div className="gallery-filter-row">
+          <span className="gallery-filter-label">Score:</span>
+          <button
+            type="button"
+            className={`gallery-filter-pill${filterScore === null ? ' active' : ''}`}
+            onClick={() => setFilterScore(null)}
+          >
+            All
+          </button>
+          {[1, 2, 3, 4, 5].map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`gallery-filter-pill${filterScore === s ? ' active' : ''}`}
+              onClick={() => setFilterScore(filterScore === s ? null : s)}
+            >
+              {s}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`gallery-filter-pill${filterScore === 'none' ? ' active' : ''}`}
+            title="Unscored images"
+            onClick={() => setFilterScore(filterScore === 'none' ? null : 'none')}
+          >
+            None
+          </button>
+        </div>
+        <div className="gallery-filter-row">
+          <span className="gallery-filter-label">Category:</span>
+          <button
+            type="button"
+            className={`gallery-filter-pill${filterCategory === null ? ' active' : ''}`}
+            onClick={() => setFilterCategory(null)}
+          >
+            All
+          </button>
+          {GALLERY_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={`gallery-filter-circle circle-${cat.id}${filterCategory === cat.id ? ' active' : ''}`}
+              style={{ backgroundColor: cat.color }}
+              title={`Category ${cat.label}`}
+              aria-label={`Filter by ${cat.label}`}
+              onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+            />
+          ))}
+          <button
+            type="button"
+            className={`gallery-filter-pill${filterCategory === 'none' ? ' active' : ''}`}
+            title="Uncategorized images"
+            onClick={() => setFilterCategory(filterCategory === 'none' ? null : 'none')}
+          >
+            None
+          </button>
+          {(filterScore !== null || filterCategory !== null) && (
+            <button
+              type="button"
+              className="gallery-filter-clear"
+              title="Reset score and category filters"
+              onClick={() => {
+                setFilterScore(null);
+                setFilterCategory(null);
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
       {galleryStatus && (
         <div className="gallery-toolbar">
           <span className="hint">{galleryStatus}</span>
@@ -182,9 +289,13 @@ export default function Gallery({ query }: { query: string }) {
       )}
       {generations.length === 0 && <p className="hint">No generations captured yet.</p>}
       {generations.length > 0 && visibleGenerations.length === 0 && (
-        <p className="hint">No prompts match “{query.trim()}”.</p>
+        <p className="hint">
+          {needle
+            ? `No prompts match "${query.trim()}" with the active filters.`
+            : 'No images match the active filters.'}
+        </p>
       )}
-      {needle && visibleGenerations.length > 0 && (
+      {isFiltered && visibleGenerations.length > 0 && (
         <p className="hint">
           {visibleGenerations.length} of {generations.length}
         </p>
@@ -192,7 +303,7 @@ export default function Gallery({ query }: { query: string }) {
       {groupByLabel(visibleGenerations).map(([label, group]) => {
         // Collapsing has to unmount the images, not just hide them: a closed
         // <details> keeps its children in the DOM, and Blink loads and decodes
-        // images inside one regardless — so a "collapsed" stash used to cost
+        // images inside one regardless - so a "collapsed" stash used to cost
         // exactly as much memory as an open one.
         const isOpen = !collapsedLabels.has(label);
         return (
@@ -240,7 +351,7 @@ export default function Gallery({ query }: { query: string }) {
                 e.stopPropagation();
                 setConfirmingLabel(label);
                 // The confirmation prompt lives outside <summary>, which a
-                // closed <details> hides — force it open so it's visible.
+                // closed <details> hides - force it open so it's visible.
                 setStashOpen(label, true);
               }}
             >
@@ -279,20 +390,63 @@ export default function Gallery({ query }: { query: string }) {
                   className={generation.id === justSavedId ? 'gallery-just-saved' : undefined}
                 >
                   {/* The Gallery renders every generation ever saved, and
-                      each src is the full-resolution PNG — so without this
+                      each src is the full-resolution PNG - so without this
                       the renderer loads and decodes the entire library on
                       open, and resident memory grows with the lifetime
                       generation count (~3GB at 2k images). `aspect-ratio`
                       in the CSS gives each one its box before it loads, so
                       the browser can tell what's offscreen and lazy works
                       properly rather than loading everything anyway. */}
-                  <img
-                    src={generation.imageUrl}
-                    alt={generation.promptText}
-                    loading="lazy"
-                    decoding="async"
-                    onClick={() => setZoomedUrl(generation.imageUrl)}
-                  />
+                  <div className="gallery-image-wrap">
+                    <div className="gallery-image-overlay">
+                      <div className="gallery-score-buttons">
+                        {[1, 2, 3, 4, 5].map((num) => {
+                          const isSelected = generation.score === num;
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              className={`gallery-score-btn${isSelected ? ' active' : ''}`}
+                              title={`Score ${num}${isSelected ? ' (click to clear)' : ''}`}
+                              aria-label={`Score ${num}${isSelected ? ' (selected)' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetScore(generation.id, isSelected ? null : num);
+                              }}
+                            >
+                              {num}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="gallery-category-circles">
+                        {GALLERY_CATEGORIES.map((cat) => {
+                          const isSelected = generation.category === cat.id;
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              className={`gallery-category-circle circle-${cat.id}${isSelected ? ' active' : ''}`}
+                              style={{ backgroundColor: cat.color }}
+                              title={`Category: ${cat.label}${isSelected ? ' (click to clear)' : ''}`}
+                              aria-label={`Category ${cat.label}${isSelected ? ' (selected)' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetCategory(generation.id, isSelected ? null : cat.id);
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <img
+                      src={generation.imageUrl}
+                      alt={generation.promptText}
+                      loading="lazy"
+                      decoding="async"
+                      onClick={() => setZoomedUrl(generation.imageUrl)}
+                    />
+                  </div>
                   <details>
                     <summary>{fullText}</summary>
                     <p>{fullText}</p>
