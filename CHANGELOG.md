@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.7.1](https://github.com/non7top/promptloom/compare/v4.7.0...v4.7.1) (2026-11-06)
+
+
+### Dependencies
+
+* bump @biomejs/biome from 2.5.15 to 2.6.4 ([63063dd](https://github.com/non7top/promptloom/commit/63063dd74ade31bb7ac833d989faeae9118a6e35))
+* bump @types/adm-zip from 0.5.8 to 0.6.0 ([1c864a0](https://github.com/non7top/promptloom/commit/1c864a0491215cb279e3df5ac1dffb3c83ffd771))
+* bump electron-builder from 26.15.3 to 26.18.0 ([e95a1da](https://github.com/non7top/promptloom/commit/e95a1dad9661ec9edb4c0d911041cba7e668a738))
+* bump react-dom from 19.3.0 to 19.3.1 ([7769ace](https://github.com/non7top/promptloom/commit/7769ace729bb80507b64cc2c138b906e74360909))
+
 ## [4.7.0](https://github.com/non7top/promptloom/compare/v4.6.2...v4.7.0) (2026-11-04)
 
 
