@@ -26,9 +26,7 @@ jobs:
   # a single `npm ci` feed the lint, type-check, bundle and package steps,
   # instead of each runner installing the tree for itself.
   build:
-    # Pinned: wine in the Wine image fails with "socket: Function not implemented" on the
-    # ubuntu-26.04 runner that ubuntu-latest now resolves to.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
@@ -41,6 +39,7 @@ jobs:
       # images are node 24 - so this is one image, one `npm ci`, one
       # node_modules. `make` picks this up via `SERVICE ?= dev`.
       SERVICE: win
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v7
         with:

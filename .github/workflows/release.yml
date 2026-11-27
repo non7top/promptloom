@@ -66,9 +66,7 @@ jobs:
     # than on a windows-latest runner - same artifact, on the cheaper SKU,
     # and the same container path `make win` uses locally. build.yml's
     # cosign dry run exercises the signing steps below on every PR.
-    # Pinned: wine in the Wine image fails with "socket: Function not implemented" on the
-    # ubuntu-26.04 runner that ubuntu-latest now resolves to.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       # Keyless cosign signing exchanges this job's OIDC token for a
@@ -77,6 +75,7 @@ jobs:
       attestations: write
     env:
       SERVICE: win
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v7
         with:
