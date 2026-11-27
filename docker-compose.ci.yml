@@ -1,0 +1,7 @@
+# CI-only overlay (COMPOSE_FILE in the workflows). Docker's default seccomp
+# profile on the ubuntu-26.04 runner makes wine fail with "socket : Function
+# not implemented"; unconfined fixes it there and is not needed locally.
+services:
+  win:
+    security_opt:
+      - seccomp=unconfined

@@ -19,6 +19,10 @@
     "email": "non7top@gmail.com"
   },
   "license": "MIT",
+  "overrides": {
+    "minimatch@^9.0.3": "^11.0.1",
+    "minimatch@^10.2.5": "^11.0.1"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
     "@electron/fuses": "^2.1.3",

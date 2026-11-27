@@ -5,7 +5,7 @@ on:
     workflows: ["release-please"]
     types: [completed]
   # Escape hatch to (re)build and publish an already-tagged release without
-  # waiting for a new release-please cycle — e.g. to backfill a release
+  # waiting for a new release-please cycle - e.g. to backfill a release
   # whose assets failed to upload for a reason unrelated to the tag itself.
   workflow_dispatch:
     inputs:
@@ -16,7 +16,7 @@ on:
 jobs:
   # release-please-action creates its tag/release using the default
   # GITHUB_TOKEN, and GitHub doesn't trigger downstream workflows for refs
-  # created that way (an anti-recursion guard) — so this can't just trigger
+  # created that way (an anti-recursion guard) - so this can't just trigger
   # on push: tags like a normal release workflow would; a completed
   # workflow_run fires regardless of what token the upstream run used.
   # release-please itself runs on every push to master, not just ones that
@@ -31,10 +31,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           # workflow_run doesn't check out the commit that triggered it by
-          # default — it checks out the default branch's current tip, which
+          # default - it checks out the default branch's current tip, which
           # may have moved on since. Pin to the exact commit release-please
           # just processed. For a manual backfill (workflow_dispatch),
-          # deliberately do NOT check out the given tag itself — the whole
+          # deliberately do NOT check out the given tag itself - the whole
           # point of a backfill is to rebuild with whatever release-process
           # fix just landed on the dispatch ref (normally master), not to
           # reproduce the original (possibly buggy) build verbatim. `tag`
@@ -51,7 +51,7 @@ jobs:
             TAG="${{ inputs.tag }}"
           else
             # grep exits 1 when no tag matches (the normal case for a non-
-            # release merge) — under this step's `-e -o pipefail` shell,
+            # release merge) - under this step's `-e -o pipefail` shell,
             # that would otherwise fail the whole step instead of just
             # yielding an empty $TAG, which is the expected, already-
             # handled case (see the `release` job's `if:` below).
@@ -63,18 +63,19 @@ jobs:
     needs: check-release-tag
     if: needs.check-release-tag.outputs.tag != ''
     # Cross-builds the Windows installer under Wine (Dockerfile.win) rather
-    # than on a windows-latest runner — same artifact, on the cheaper SKU,
+    # than on a windows-latest runner - same artifact, on the cheaper SKU,
     # and the same container path `make win` uses locally. build.yml's
     # cosign dry run exercises the signing steps below on every PR.
     runs-on: ubuntu-latest
     permissions:
       contents: write
       # Keyless cosign signing exchanges this job's OIDC token for a
-      # short-lived Fulcio cert — no signing key ever touches the repo.
+      # short-lived Fulcio cert - no signing key ever touches the repo.
       id-token: write
       attestations: write
     env:
       SERVICE: win
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v7
         with:
@@ -98,7 +99,7 @@ jobs:
         env:
           # electron-builder's GitHub publisher reads GH_TOKEN specifically
           # (not GITHUB_TOKEN, which was electron-forge's PublisherGithub
-          # convention) — set both since nothing else here reads either.
+          # convention) - set both since nothing else here reads either.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -121,7 +122,7 @@ jobs:
       # whatever the maker produced locally (already uploaded by the
       # publish step above) rather than re-downloading from the release.
       # electron-builder's NSIS target produces a single installer .exe in
-      # dist/ — no .nupkg/RELEASES equivalents (those were Squirrel-only
+      # dist/ - no .nupkg/RELEASES equivalents (those were Squirrel-only
       # update-feed files).
       - name: Sign release artifacts (cosign, keyless)
         id: cosign_sign
