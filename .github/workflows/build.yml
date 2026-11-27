@@ -21,12 +21,14 @@ concurrency:
 jobs:
   # One job, not the old lint-on-Linux + package-on-Windows pair. The
   # Windows installer cross-builds under Wine (see Dockerfile.win), which
-  # removes the only reason a Windows runner was involved — and Windows
+  # removes the only reason a Windows runner was involved - and Windows
   # minutes bill at 1.67x Linux. Chaining also means a single checkout and
   # a single `npm ci` feed the lint, type-check, bundle and package steps,
   # instead of each runner installing the tree for itself.
   build:
-    runs-on: ubuntu-latest
+    # Pinned: wine in the Wine image fails with "socket: Function not implemented" on the
+    # ubuntu-26.04 runner that ubuntu-latest now resolves to.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
@@ -36,7 +38,7 @@ jobs:
       # Run every containerised step in the Wine image rather than pulling
       # the dev image as well. Nothing in CI launches the app, so the dev
       # image's xvfb + Chromium runtime libs are dead weight here, and both
-      # images are node 24 — so this is one image, one `npm ci`, one
+      # images are node 24 - so this is one image, one `npm ci`, one
       # node_modules. `make` picks this up via `SERVICE ?= dev`.
       SERVICE: win
     steps:
@@ -48,7 +50,7 @@ jobs:
           fetch-depth: 0
 
       # Recorded before release-please-forecast moves HEAD around, so the
-      # build below can return to exactly what was checked out here — the
+      # build below can return to exactly what was checked out here - the
       # PR merged into master, for a pull_request event.
       - name: Record the checked-out commit
         id: checked_out
@@ -56,7 +58,7 @@ jobs:
 
       # The only image CI builds. No buildx layer cache on it deliberately:
       # it's a single chown on top of upstream's Wine image, so essentially
-      # all of its cost is pulling that ~1.5GB base — which a layer cache
+      # all of its cost is pulling that ~1.5GB base - which a layer cache
       # doesn't avoid, and which `--load` would make worse by re-exporting
       # it into the daemon. Measured 96s, the largest step in the job; if
       # that needs to come down, a slim prebuilt image on GHCR is the
@@ -70,7 +72,7 @@ jobs:
       - name: Lint and type-check
         run: make check
 
-      # post-comment: false — this action's own PR comment/RELEASE-label
+      # post-comment: false - this action's own PR comment/RELEASE-label
       # side effects are release-please-preview.yml's job; here we only
       # want the predicted version, to name this PR's build artifacts.
       #
@@ -82,7 +84,7 @@ jobs:
         if: github.event_name == 'pull_request'
         # Back on the moving @v1 tag. Pinning to v1.1.0 was the workaround
         # for release-please-forecast#4, but v1.1.0 predates the fix for
-        # release-please-forecast#2 — so it was the pin that made this
+        # release-please-forecast#2 - so it was the pin that made this
         # repo's own release PRs predict 1.0.0 instead of the real version
         # (see promptloom#107). @v1 now points at v1.2.0, which has that
         # fix, and release-please-forecast#6 moves the major tag from CI on
@@ -100,7 +102,7 @@ jobs:
       # Back to what actions/checkout produced, NOT to `preview-head`.
       # preview-head is the PR branch tip *without* the base merged in, so a
       # branch cut before some change landed on master builds without that
-      # change — which is how a PR opened before the Makefile existed failed
+      # change - which is how a PR opened before the Makefile existed failed
       # with "make: *** No rule to make target 'win'" (promptloom#125) even
       # though master had the Makefile. For a pull_request event
       # actions/checkout checks out refs/pull/N/merge, i.e. the PR already
@@ -124,7 +126,7 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2
 
       # This PR build never becomes a real release, so there's nothing to
-      # attach this to — it exists purely to prove the keyless sign/verify
+      # attach this to - it exists purely to prove the keyless sign/verify
       # invocation used in release.yml actually works against a real
       # installer file before that (CI-unverifiable) step ever runs for
       # real. See release.yml for the step that matters.
@@ -137,11 +139,11 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$EXE_PATH"
 
-      # Only meaningful for PR builds with a predicted release — plain
+      # Only meaningful for PR builds with a predicted release - plain
       # pushes to master (already merged, not previewing anything) and
       # no-releasable-change PRs keep the plain glob path below instead.
       # electron-builder's NSIS target produces a single Setup .exe (no
-      # separate .nupkg/RELEASES — those were Squirrel-specific update-feed
+      # separate .nupkg/RELEASES - those were Squirrel-specific update-feed
       # files; this app has no in-app auto-updater consuming them).
       - name: Rename build artifact to the predicted version
         id: artifact_names
@@ -159,13 +161,13 @@ jobs:
         id: upload-installer
         uses: actions/upload-artifact@v7
         with:
-          # `name` is ignored by the action whenever archive: false — the
+          # `name` is ignored by the action whenever archive: false - the
           # artifact takes the name of the file it's given instead, so the
           # rename step above (when it ran) is what actually names this.
           path: ${{ steps.artifact_names.outputs.exe_path || 'dist/*.exe' }}
           retention-days: 14
           # Skip the action's own zip wrapper entirely rather than just
-          # turning off its compression — Setup.exe is already a compressed
+          # turning off its compression - Setup.exe is already a compressed
           # archive internally, so both were pure overhead.
           archive: false
 
